@@ -1,49 +1,333 @@
 
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
-  <title>MediaPipe Test</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Try On Time - Hand Detection</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f5fa;
+      text-align: center;
+      padding: 25px;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: auto;
+      background: white;
+      padding: 25px;
+      border-radius: 12px;
+    }
+
+    h1 {
+      color: #51459c;
+    }
+
+    button {
+      padding: 12px 20px;
+      margin: 10px;
+      border: none;
+      border-radius: 6px;
+      background: #6655b8;
+      color: white;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      background: #aaa;
+      cursor: not-allowed;
+    }
+
+    input {
+      margin: 15px;
+    }
+
+    canvas {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      margin: 20px auto;
+      border: 1px solid #ccc;
+    }
+
+    #status {
+      font-weight: bold;
+      margin: 15px;
+    }
+  </style>
 </head>
 
 <body>
 
-  <h2>TRY ON TIME - MediaPipe Setup</h2>
+  <div class="container">
 
-  <button id="loadBtn">Load MediaPipe</button>
+    <h1>TRY ON TIME</h1>
+    <h3>Hand Landmark Detection</h3>
 
-  <p id="status">Click the button to start.</p>
+    <button id="loadBtn">Load MediaPipe</button>
+
+    <br>
+
+    <input type="file"
+           id="imageInput"
+           accept="image/*">
+
+    <br>
+
+    <button id="detectBtn" disabled>
+      Detect Hand Landmarks
+    </button>
+
+    <p id="status">Load MediaPipe to begin.</p>
+
+    <canvas id="outputCanvas"></canvas>
+
+    <p id="coordinates"></p>
+
+  </div>
 
   <script type="module">
-    import { initializeHandLandmarker }
-      from "../js/wristDetection.js";
 
-    const button = document.getElementById("loadBtn");
+    import {
+      initializeHandLandmarker,
+      detectHandLandmarks
+    } from "../js/wristDetection.js";
+
+    const loadBtn = document.getElementById("loadBtn");
+    const detectBtn = document.getElementById("detectBtn");
+    const imageInput = document.getElementById("imageInput");
+
     const status = document.getElementById("status");
+    const coordinates = document.getElementById("coordinates");
 
-    button.addEventListener("click", async () => {
+    const canvas = document.getElementById("outputCanvas");
+    const ctx = canvas.getContext("2d");
 
-      button.disabled = true;
+    let selectedImage = null;
+    let modelReady = false;
+
+    // Hand skeleton connections
+    const connections = [
+      [0, 1], [1, 2], [2, 3], [3, 4],
+      [0, 5], [5, 6], [6, 7], [7, 8],
+      [5, 9], [9, 10], [10, 11], [11, 12],
+      [9, 13], [13, 14], [14, 15], [15, 16],
+      [13, 17], [17, 18], [18, 19], [19, 20],
+      [0, 17]
+    ];
+
+    function updateButton() {
+      detectBtn.disabled = !modelReady || !selectedImage;
+    }
+
+    // Load MediaPipe
+    loadBtn.addEventListener("click", async () => {
+
+      loadBtn.disabled = true;
       status.textContent = "Loading MediaPipe...";
 
       try {
-        const detector =
-          await initializeHandLandmarker();
+        await initializeHandLandmarker();
 
-        console.log("MediaPipe initialized:", detector);
+        modelReady = true;
+        status.textContent = "MediaPipe loaded successfully!";
 
-        status.textContent =
-          "MediaPipe loaded successfully!";
+        updateButton();
 
       } catch (error) {
         console.error(error);
-
-        status.textContent =
-          "Failed to load MediaPipe. Check console.";
-
-        button.disabled = false;
+        status.textContent = "Failed to load MediaPipe.";
+        loadBtn.disabled = false;
       }
     });
+
+    // Upload image
+    imageInput.addEventListener("change", async (event) => {
+
+      const file = event.target.files[0];
+
+      selectedImage = null;
+      updateButton();
+      coordinates.textContent = "";
+
+      if (!file) {
+        return;
+      }
+
+      if (!file.type.startsWith("image/")) {
+        status.textContent = "Please choose an image file.";
+        return;
+      }
+
+      const imageURL = URL.createObjectURL(file);
+
+      try {
+        const image = new Image();
+        image.src = imageURL;
+
+        await image.decode();
+
+        selectedImage = image;
+
+        canvas.width = image.naturalWidth;
+        canvas.height = image.naturalHeight;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(image, 0, 0);
+
+        status.textContent =
+          "Image uploaded. Click Detect Hand Landmarks.";
+
+        updateButton();
+
+      } catch (error) {
+        console.error(error);
+        status.textContent = "Could not open the image.";
+      } finally {
+        URL.revokeObjectURL(imageURL);
+      }
+    });
+
+    // Draw detected landmarks
+    function drawLandmarks(landmarks) {
+
+      const scale = Math.max(1, canvas.width / 600);
+
+      // Draw green hand connections
+      ctx.strokeStyle = "green";
+      ctx.lineWidth = 2 * scale;
+
+      connections.forEach(([start, end]) => {
+
+        const p1 = landmarks[start];
+        const p2 = landmarks[end];
+
+        ctx.beginPath();
+
+        ctx.moveTo(
+          p1.x * canvas.width,
+          p1.y * canvas.height
+        );
+
+        ctx.lineTo(
+          p2.x * canvas.width,
+          p2.y * canvas.height
+        );
+
+        ctx.stroke();
+      });
+
+      // Draw yellow landmark points
+      landmarks.forEach((point, index) => {
+
+        const x = point.x * canvas.width;
+        const y = point.y * canvas.height;
+
+        ctx.beginPath();
+        ctx.arc(x, y, 4 * scale, 0, 2 * Math.PI);
+
+        ctx.fillStyle = index === 0 ? "red" : "yellow";
+        ctx.fill();
+
+        ctx.strokeStyle = "black";
+        ctx.lineWidth = 1 * scale;
+        ctx.stroke();
+      });
+
+      // Highlight wrist landmark 0
+      const wrist = landmarks[0];
+
+      ctx.beginPath();
+
+      ctx.arc(
+        wrist.x * canvas.width,
+        wrist.y * canvas.height,
+        7 * scale,
+        0,
+        2 * Math.PI
+      );
+
+      ctx.fillStyle = "red";
+      ctx.fill();
+
+      ctx.strokeStyle = "white";
+      ctx.lineWidth = 2 * scale;
+      ctx.stroke();
+    }
+
+    // Detect hand landmarks
+    detectBtn.addEventListener("click", async () => {
+
+      if (!selectedImage || !modelReady) {
+        return;
+      }
+
+      detectBtn.disabled = true;
+      status.textContent = "Detecting hand...";
+
+      try {
+
+        const result =
+          await detectHandLandmarks(selectedImage);
+
+        // Clear previous drawing
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        ctx.drawImage(
+          selectedImage,
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        );
+
+        if (!result.detected) {
+
+          status.textContent =
+            "No hand detected. Try a clearer image.";
+
+          coordinates.textContent = "";
+          return;
+        }
+
+        drawLandmarks(result.landmarks);
+
+        const wrist = result.wrist;
+
+        const wristX = Math.round(
+          wrist.x * canvas.width
+        );
+
+        const wristY = Math.round(
+          wrist.y * canvas.height
+        );
+
+        status.textContent =
+          "Success! 21 hand landmarks detected.";
+
+        coordinates.textContent =
+          `Wrist Position: X = ${wristX}, Y = ${wristY}`;
+
+        console.log("Landmarks:", result.landmarks);
+        console.log("Wrist:", wrist);
+
+      } catch (error) {
+
+        console.error(error);
+
+        status.textContent =
+          "Detection failed. Check browser console.";
+
+      } finally {
+        updateButton();
+      }
+    });
+
   </script>
 
 </body>

@@ -1,0 +1,50 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>MediaPipe Test</title>
+</head>
+
+<body>
+
+  <h2>TRY ON TIME - MediaPipe Setup</h2>
+
+  <button id="loadBtn">Load MediaPipe</button>
+
+  <p id="status">Click the button to start.</p>
+
+  <script type="module">
+    import { initializeHandLandmarker }
+      from "../js/wristDetection.js";
+
+    const button = document.getElementById("loadBtn");
+    const status = document.getElementById("status");
+
+    button.addEventListener("click", async () => {
+
+      button.disabled = true;
+      status.textContent = "Loading MediaPipe...";
+
+      try {
+        const detector =
+          await initializeHandLandmarker();
+
+        console.log("MediaPipe initialized:", detector);
+
+        status.textContent =
+          "MediaPipe loaded successfully!";
+
+      } catch (error) {
+        console.error(error);
+
+        status.textContent =
+          "Failed to load MediaPipe. Check console.";
+
+        button.disabled = false;
+      }
+    });
+  </script>
+
+</body>
+</html>

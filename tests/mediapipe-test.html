@@ -89,14 +89,22 @@
 
     <p id="coordinates"></p>
 
+    
+    <h3>Estimated Watch Placement</h3>
+    <pre id="placementInfo"></pre>
+
+
   </div>
 
   <script type="module">
 
+
     import {
       initializeHandLandmarker,
-      detectHandLandmarks
+      detectHandLandmarks,
+      calculateWatchPlacement
     } from "../js/wristDetection.js";
+
 
     const loadBtn = document.getElementById("loadBtn");
     const detectBtn = document.getElementById("detectBtn");
@@ -120,6 +128,8 @@
       [13, 17], [17, 18], [18, 19], [19, 20],
       [0, 17]
     ];
+
+    const placementInfo = document.getElementById("placementInfo");
 
     function updateButton() {
       detectBtn.disabled = !modelReady || !selectedImage;
@@ -260,6 +270,43 @@
       ctx.stroke();
     }
 
+    
+// Draw estimated watch placement guide
+    function drawWatchGuide(watch) {
+
+      ctx.save();
+
+      // Move drawing origin to watch center
+      ctx.translate(watch.x, watch.y);
+
+      // Rotate to match wrist direction
+      ctx.rotate(watch.angle * Math.PI / 180);
+
+      // Draw watch placement rectangle
+      ctx.strokeStyle = "blue";
+      ctx.lineWidth = Math.max(2, canvas.width / 450);
+
+      ctx.setLineDash([10, 6]);
+
+      ctx.strokeRect(
+        -watch.width / 2,
+        -watch.height / 2,
+        watch.width,
+        watch.height
+      );
+
+      ctx.setLineDash([]);
+
+      // Mark center of the watch
+      ctx.beginPath();
+      ctx.arc(0, 0, 6, 0, 2 * Math.PI);
+      ctx.fillStyle = "blue";
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+
     // Detect hand landmarks
     detectBtn.addEventListener("click", async () => {
 
@@ -295,26 +342,46 @@
           return;
         }
 
-        drawLandmarks(result.landmarks);
+        
+      // Draw hand landmarks
+      drawLandmarks(result.landmarks);
 
-        const wrist = result.wrist;
+      // Calculate watch placement
+      const watch = calculateWatchPlacement(
+        result.landmarks,
+        canvas.width,
+        canvas.height
+      );
 
-        const wristX = Math.round(
-          wrist.x * canvas.width
-        );
-
-        const wristY = Math.round(
-          wrist.y * canvas.height
-        );
-
+      if (!watch) {
         status.textContent =
-          "Success! 21 hand landmarks detected.";
+          "Hand detected, but watch position could not be calculated.";
 
-        coordinates.textContent =
-          `Wrist Position: X = ${wristX}, Y = ${wristY}`;
+        coordinates.textContent = "";
+        placementInfo.textContent = "";
+        return;
+      }
 
-        console.log("Landmarks:", result.landmarks);
-        console.log("Wrist:", wrist);
+      // Draw the estimated watch area
+      drawWatchGuide(watch);
+
+      // Display wrist coordinates
+      coordinates.textContent =
+        `Wrist Landmark: X = ${watch.wristX}, Y = ${watch.wristY}`;
+
+      // Display watch placement values
+      placementInfo.textContent =
+        JSON.stringify(watch, null, 2);
+
+      if (watch.centerInsideImage) {
+        status.textContent =
+          "Watch position, size and angle calculated!";
+      } else {
+        status.textContent =
+          "Watch center is outside the image. Try an image showing more forearm.";
+      }
+
+      console.log("Watch Placement:", watch);
 
       } catch (error) {
 

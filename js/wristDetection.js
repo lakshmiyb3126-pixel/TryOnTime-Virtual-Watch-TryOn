@@ -62,3 +62,96 @@ export async function detectHandLandmarks(image) {
     wrist: landmarks[0]
   };
 }
+
+
+/* ==========================================
+   PHASE 3 - WATCH PLACEMENT CALCULATION
+========================================== */
+
+export function calculateWatchPlacement(
+  landmarks,
+  imageWidth,
+  imageHeight
+) {
+
+  if (!landmarks || landmarks.length !== 21) {
+    return null;
+  }
+
+  // Convert normalized landmark positions into pixels
+  function getPoint(index) {
+    return {
+      x: landmarks[index].x * imageWidth,
+      y: landmarks[index].y * imageHeight
+    };
+  }
+
+  const wrist = getPoint(0);
+  const indexFinger = getPoint(5);
+  const middleFinger = getPoint(9);
+  const pinkyFinger = getPoint(17);
+
+  // Step 1: Estimate palm width
+  const palmWidth = Math.hypot(
+    indexFinger.x - pinkyFinger.x,
+    indexFinger.y - pinkyFinger.y
+  );
+
+  // Step 2: Calculate direction from palm to wrist
+  const dx = wrist.x - middleFinger.x;
+  const dy = wrist.y - middleFinger.y;
+
+  const distance = Math.hypot(dx, dy);
+
+  if (
+    !Number.isFinite(palmWidth) ||
+    !Number.isFinite(distance) ||
+    palmWidth < 5 ||
+    distance < 5
+  ) {
+    return null;
+  }
+
+  // Step 3: Normalize forearm direction
+  const directionX = dx / distance;
+  const directionY = dy / distance;
+
+  // Step 4: Estimate watch center beyond wrist landmark
+  const offset = palmWidth * 0.55;
+
+  const watchX = wrist.x + directionX * offset;
+  const watchY = wrist.y + directionY * offset;
+
+  // Step 5: Estimate watch dimensions
+  const watchWidth = palmWidth * 0.68;
+  const watchHeight = watchWidth * 1.35;
+
+  // Step 6: Calculate rotation angle
+  // Assumes the watch image is vertically oriented
+  const angleRadians =
+    Math.atan2(directionY, directionX) -
+    Math.PI / 2;
+
+  const angleDegrees =
+    angleRadians * (180 / Math.PI);
+
+  return {
+    x: Math.round(watchX),
+    y: Math.round(watchY),
+    width: Math.round(watchWidth),
+    height: Math.round(watchHeight),
+    angle: Number(angleDegrees.toFixed(1)),
+
+    wristX: Math.round(wrist.x),
+    wristY: Math.round(wrist.y),
+
+    centerInsideImage:
+      watchX >= 0 &&
+      watchX < imageWidth &&
+      watchY >= 0 &&
+      watchY < imageHeight
+  };
+}
+
+
+

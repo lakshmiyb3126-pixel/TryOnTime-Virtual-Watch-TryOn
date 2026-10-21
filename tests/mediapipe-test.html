@@ -59,6 +59,38 @@
       font-weight: bold;
       margin: 15px;
     }
+
+    
+    /* Phase 4 Adjustment Panel */
+
+    #adjustmentPanel {
+      margin-top: 20px;
+      padding: 20px;
+      background: #f0eeff;
+      border-radius: 10px;
+    }
+
+    #adjustmentPanel[hidden] {
+      display: none;
+    }
+
+    #adjustmentPanel label {
+      display: block;
+      margin-top: 15px;
+      font-weight: bold;
+    }
+
+    #adjustmentPanel input[type="range"] {
+      display: block;
+      width: 80%;
+      max-width: 350px;
+      margin: 10px auto;
+    }
+
+    #fitStatus {
+      font-weight: bold;
+    }
+
   </style>
 </head>
 
@@ -93,17 +125,63 @@
     <h3>Estimated Watch Placement</h3>
     <pre id="placementInfo"></pre>
 
+    
+    <!-- Phase 4: Manual Adjustment Controls -->
+
+    <div id="adjustmentPanel" hidden>
+
+      <h3>Adjust Watch Placement</h3>
+
+      <label for="moveX">
+        Horizontal Position: <span id="moveXValue">0</span>%
+      </label>
+      <input type="range" id="moveX"
+            min="-50" max="50" value="0">
+
+      <label for="moveY">
+        Vertical Position: <span id="moveYValue">0</span>%
+      </label>
+      <input type="range" id="moveY"
+            min="-50" max="50" value="0">
+
+      <label for="watchSize">
+        Watch Size: <span id="watchSizeValue">100</span>%
+      </label>
+      <input type="range" id="watchSize"
+            min="60" max="140" value="100">
+
+      <label for="watchAngle">
+        Extra Rotation: <span id="watchAngleValue">0</span>°
+      </label>
+      <input type="range" id="watchAngle"
+            min="-45" max="45" value="0">
+
+      <br>
+
+      <button id="resetAdjustment">
+        Reset Adjustments
+      </button>
+
+      <p id="fitStatus"></p>
+
+    </div>
+
+
 
   </div>
 
   <script type="module">
 
 
+        
     import {
       initializeHandLandmarker,
       detectHandLandmarks,
-      calculateWatchPlacement
+      calculateWatchPlacement,
+      adjustWatchPlacement,
+      getWatchFitStatus
     } from "../js/wristDetection.js";
+
 
 
     const loadBtn = document.getElementById("loadBtn");
@@ -118,6 +196,25 @@
 
     let selectedImage = null;
     let modelReady = false;
+
+    
+    // Phase 4 variables
+    let baseWatch = null;
+    let savedLandmarks = null;
+
+    const adjustmentPanel =
+      document.getElementById("adjustmentPanel");
+
+    const fitStatus =
+      document.getElementById("fitStatus");
+
+    const controls = {
+      moveX: document.getElementById("moveX"),
+      moveY: document.getElementById("moveY"),
+      watchSize: document.getElementById("watchSize"),
+      watchAngle: document.getElementById("watchAngle")
+    };
+
 
     // Hand skeleton connections
     const connections = [
@@ -164,6 +261,7 @@
       selectedImage = null;
       updateButton();
       coordinates.textContent = "";
+      clearAdjustment();
 
       if (!file) {
         return;
@@ -306,6 +404,115 @@
       ctx.restore();
     }
 
+        
+    // PHASE 4 - Redraw watch when slider changes
+
+    function redrawWatch() {
+
+      if (!baseWatch || !savedLandmarks || !selectedImage) {
+        return;
+      }
+
+      const adjustments = {
+        horizontalPercent: Number(controls.moveX.value),
+        verticalPercent: Number(controls.moveY.value),
+        scalePercent: Number(controls.watchSize.value),
+        angleDegrees: Number(controls.watchAngle.value)
+      };
+
+      const watch = adjustWatchPlacement(
+        baseWatch,
+        adjustments,
+        canvas.width,
+        canvas.height
+      );
+
+      // Clear previous drawing
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Draw original wrist image again
+      ctx.drawImage(
+        selectedImage,
+        0,
+        0,
+        canvas.width,
+        canvas.height
+      );
+
+      // Draw landmarks and adjusted watch guide
+      drawLandmarks(savedLandmarks);
+      drawWatchGuide(watch);
+
+      // Display wrist coordinates
+      coordinates.textContent =
+        `Wrist Landmark: X = ${watch.wristX}, Y = ${watch.wristY}`;
+
+      // Display current placement
+      placementInfo.textContent =
+        JSON.stringify(watch, null, 2);
+
+      // Update slider labels
+      document.getElementById("moveXValue").textContent =
+        controls.moveX.value;
+
+      document.getElementById("moveYValue").textContent =
+        controls.moveY.value;
+
+      document.getElementById("watchSizeValue").textContent =
+        controls.watchSize.value;
+
+      document.getElementById("watchAngleValue").textContent =
+        controls.watchAngle.value;
+
+      // Check image boundaries
+      const fit = getWatchFitStatus(
+        watch,
+        canvas.width,
+        canvas.height
+      );
+
+      fitStatus.textContent = fit.message;
+      fitStatus.style.color = fit.fits ? "green" : "darkred";
+
+      status.textContent = fit.fits
+        ? "Watch placement ready. You can fine-tune it."
+        : "Placement needs adjustment.";
+
+      console.log("Adjusted Watch Placement:", watch);
+    }
+
+
+    // Update guide whenever a slider moves
+    Object.values(controls).forEach(slider => {
+      slider.addEventListener("input", redrawWatch);
+    });
+
+
+    // Reset controls to automatic estimates
+    document.getElementById("resetAdjustment")
+      .addEventListener("click", () => {
+
+        controls.moveX.value = 0;
+        controls.moveY.value = 0;
+        controls.watchSize.value = 100;
+        controls.watchAngle.value = 0;
+
+        redrawWatch();
+      });
+
+
+    // Clear old adjustment results
+    function clearAdjustment() {
+      baseWatch = null;
+      savedLandmarks = null;
+
+      adjustmentPanel.hidden = true;
+
+      placementInfo.textContent = "";
+      fitStatus.textContent = "";
+    }
+
+
 
     // Detect hand landmarks
     detectBtn.addEventListener("click", async () => {
@@ -316,6 +523,7 @@
 
       detectBtn.disabled = true;
       status.textContent = "Detecting hand...";
+      clearAdjustment();
 
       try {
 
@@ -343,45 +551,41 @@
         }
 
         
-      // Draw hand landmarks
-      drawLandmarks(result.landmarks);
 
-      // Calculate watch placement
-      const watch = calculateWatchPlacement(
-        result.landmarks,
-        canvas.width,
-        canvas.height
-      );
+        // PHASE 4 - Calculate and prepare placement
 
-      if (!watch) {
-        status.textContent =
-          "Hand detected, but watch position could not be calculated.";
+        const watch = calculateWatchPlacement(
+          result.landmarks,
+          canvas.width,
+          canvas.height
+        );
 
-        coordinates.textContent = "";
-        placementInfo.textContent = "";
-        return;
-      }
+        if (!watch) {
 
-      // Draw the estimated watch area
-      drawWatchGuide(watch);
+          clearAdjustment();
 
-      // Display wrist coordinates
-      coordinates.textContent =
-        `Wrist Landmark: X = ${watch.wristX}, Y = ${watch.wristY}`;
+          drawLandmarks(result.landmarks);
 
-      // Display watch placement values
-      placementInfo.textContent =
-        JSON.stringify(watch, null, 2);
+          coordinates.textContent = "";
 
-      if (watch.centerInsideImage) {
-        status.textContent =
-          "Watch position, size and angle calculated!";
-      } else {
-        status.textContent =
-          "Watch center is outside the image. Try an image showing more forearm.";
-      }
+          status.textContent =
+            "Hand detected, but placement could not be calculated.";
 
-      console.log("Watch Placement:", watch);
+          return;
+        }
+
+        // Save original automatic calculation
+        baseWatch = watch;
+        savedLandmarks = result.landmarks;
+
+        // Show adjustment controls
+        adjustmentPanel.hidden = false;
+
+        // Draw initial watch placement
+        redrawWatch();
+
+        console.log("Original Watch Placement:", baseWatch);
+
 
       } catch (error) {
 

@@ -154,4 +154,94 @@ export function calculateWatchPlacement(
 }
 
 
+// PHASE 4 - MANUAL WATCH ADJUSTMENT
+
+export function adjustWatchPlacement(
+  baseWatch,
+  adjustments,
+  imageWidth,
+  imageHeight
+) {
+  if (!baseWatch) return null;
+
+  const {
+    horizontalPercent = 0,
+    verticalPercent = 0,
+    scalePercent = 100,
+    angleDegrees = 0
+  } = adjustments;
+
+  const scale = scalePercent / 100;
+
+  const x = baseWatch.x +
+    (baseWatch.width * horizontalPercent / 100);
+
+  const y = baseWatch.y +
+    (baseWatch.width * verticalPercent / 100);
+
+  const width = baseWatch.width * scale;
+  const height = baseWatch.height * scale;
+
+  const angle = baseWatch.angle + angleDegrees;
+
+  return {
+    ...baseWatch,
+
+    x: Math.round(x),
+    y: Math.round(y),
+    width: Math.round(width),
+    height: Math.round(height),
+    angle: Number(angle.toFixed(1)),
+
+    centerInsideImage:
+      x >= 0 && x <= imageWidth &&
+      y >= 0 && y <= imageHeight
+  };
+}
+
+
+// Check if entire rotated watch area fits
+export function getWatchFitStatus(
+  watch,
+  imageWidth,
+  imageHeight
+) {
+  if (!watch) {
+    return {
+      fits: false,
+      message: "No watch placement available."
+    };
+  }
+
+  const radians = watch.angle * Math.PI / 180;
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+
+  const halfW = watch.width / 2;
+  const halfH = watch.height / 2;
+
+  const corners = [
+    [-halfW, -halfH],
+    [halfW, -halfH],
+    [halfW, halfH],
+    [-halfW, halfH]
+  ];
+
+  const fits = corners.every(([dx, dy]) => {
+    const x = watch.x + dx * cos - dy * sin;
+    const y = watch.y + dx * sin + dy * cos;
+
+    return x >= 0 && x <= imageWidth &&
+           y >= 0 && y <= imageHeight;
+  });
+
+  return {
+    fits,
+    message: fits
+      ? "Watch area fits inside the image."
+      : "Watch area extends outside the image. Adjust it or upload a photo showing more forearm."
+  };
+}
+
+
 

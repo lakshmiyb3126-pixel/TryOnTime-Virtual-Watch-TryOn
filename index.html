@@ -8,138 +8,135 @@
 
   <title>TRY ON TIME - Virtual Watch Try-On</title>
 
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f3f0ff;
-      padding: 20px;
-      text-align: center;
-    }
-
-    .controls {
-      background: white;
-      max-width: 650px;
-      margin: 20px auto;
-      padding: 25px;
-      border-radius: 12px;
-    }
-
-    h2 {
-      color: #51459c;
-    }
-
-    .control {
-      margin: 18px 0;
-    }
-
-    .control label {
-      display: block;
-      margin-bottom: 8px;
-    }
-
-    input[type="range"] {
-      width: 80%;
-      max-width: 400px;
-    }
-
-    button {
-      background: #6554b3;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      padding: 12px 20px;
-      margin: 6px;
-      cursor: pointer;
-    }
-
-    button:disabled {
-      background: #aaa;
-      cursor: not-allowed;
-    }
-
-    canvas {
-      display: none;
-      width: 100%;
-      max-width: 900px;
-      height: auto;
-      margin: 20px auto;
-      border: 1px solid #ccc;
-      background: white;
-    }
-
-    #status {
-      font-weight: bold;
-      margin-top: 18px;
-    }
-  </style>
+  <link rel="stylesheet" href="style.css">
 </head>
+
 
 <body>
 
-  <h2>TRY ON TIME</h2>
-  <h3>Virtual Watch Try-On</h3>
+    <!-- Website Header -->
+    <header class="site-header">
+        <h1>TRY ON <span>TIME</span></h1>
+        <div class="brand-line"></div>
+        <p>Discover Your Perfect Watch, Virtually</p>
+    </header>
 
-  <div class="controls">
+    <main class="main-container">
 
-    <p>Upload Wrist Image:</p>
-    <input type="file" id="wristUpload"
-           accept="image/jpeg,image/png">
+        <h2 class="section-title">
+            Experience Your Style
+        </h2>
 
-    <p>Upload Watch Image:</p>
-    <input type="file" id="watchUpload"
-           accept="image/png">
+        <p class="section-description">
+            Upload your wrist and watch images to see
+            how your favorite watch looks on you.
+        </p>
 
-    <h3>Adjust Watch Placement</h3>
+        <!-- Upload Section -->
+        <section class="upload-container">
 
-    <div class="control">
-      <label>
-        Horizontal Adjustment:
-        <span id="xValue">0</span>%
-      </label>
-      <input type="range" id="x"
-             min="-100" max="100" value="0">
-    </div>
+            <div class="upload-card wrist-card">
+                <div class="upload-icon">📷</div>
 
-    <div class="control">
-      <label>
-        Vertical Adjustment:
-        <span id="yValue">0</span>%
-      </label>
-      <input type="range" id="y"
-             min="-100" max="100" value="0">
-    </div>
+                <h3>Upload Wrist Image</h3>
 
-    <div class="control">
-      <label>
-        Watch Size:
-        <span id="sizeValue">100</span>%
-      </label>
-      <input type="range" id="size"
-             min="50" max="180" value="100">
-    </div>
+                <p>
+                    Choose a clear image showing your
+                    hand and wrist.
+                </p>
 
-    <div class="control">
-      <label>
-        Extra Rotation:
-        <span id="angleValue">0</span>°
-      </label>
-      <input type="range" id="angle"
-             min="-180" max="180" value="0">
-    </div>
+                <input
+                    type="file"
+                    id="wristUpload"
+                    accept="image/jpeg,image/png"
+                >
+            </div>
 
-    <button id="tryOnBtn">Try On Watch</button>
+            <div class="upload-card watch-card">
+                <div class="upload-icon">⌚</div>
 
-    <button id="downloadBtn" disabled>
-      Download Preview
-    </button>
+                <h3>Upload Watch Image</h3>
 
-    <p id="status">
-      Upload images or use the sample images.
-    </p>
+                <p>
+                    Select a PNG image of the watch
+                    you would like to try on.
+                </p>
 
-  </div>
+                <input
+                    type="file"
+                    id="watchUpload"
+                    accept="image/png"
+                >
+            </div>
 
-  <canvas id="previewCanvas"></canvas>
+        </section>
+
+        <!-- Existing adjustment controls -->
+        <section hidden aria-label="Watch adjustments">
+
+            <input type="range" id="x"
+                   min="-100" max="100" value="0">
+            <span id="xValue">0</span>
+
+            <input type="range" id="y"
+                   min="-100" max="100" value="0">
+            <span id="yValue">0</span>
+
+            <input type="range" id="size"
+                   min="50" max="180" value="100">
+            <span id="sizeValue">100</span>
+
+            <input type="range" id="angle"
+                   min="-180" max="180" value="0">
+            <span id="angleValue">0</span>
+
+        </section>
+
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+
+            <button id="tryOnBtn">
+                ✨ Try On Watch
+            </button>
+
+            <button id="resetBtn" class="secondary-btn">
+                Reset
+            </button>
+
+            
+
+            <button id="downloadBtn" disabled>
+                Download Preview
+            </button>
+
+        </div>
+
+        <!-- Preview Section -->
+        <section class="preview-section">
+
+            <h2>Your Virtual Watch Preview</h2>
+
+            <p>
+                Your selected watch will appear
+                on your wrist here.
+            </p>
+
+            <canvas id="previewCanvas"></canvas>
+
+            <p id="status" role="status" aria-live="polite">
+                Upload your wrist and watch images to begin.
+            </p>
+
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+        TRY ON TIME | Virtual Watch Try-On
+    </footer>
+
+
 
   <!-- Kavana's original watch placement module -->
   <script src="js/watchPlacement.js"></script>
@@ -164,6 +161,8 @@
     const downloadBtn =
       document.getElementById("downloadBtn");
 
+    const resetBtn =
+    document.getElementById("resetBtn");
     const wristUpload =
       document.getElementById("wristUpload");
 
@@ -415,6 +414,37 @@
       await startTryOn();
     });
 
+    
+    // Reset the complete try-on
+    resetBtn.addEventListener("click", () => {
+
+      // Clear current preview and pending operations
+      clearPreview("Ready for a new virtual try-on.");
+
+      // Remove uploaded file selections
+      wristUpload.value = "";
+      watchUpload.value = "";
+
+      // Restore original sample images
+      wristSource = "assets/wrist.jpg";
+      watchSource = "assets/watch.png";
+
+      // Release previous uploaded image URLs
+      if (wristObjectURL) {
+        URL.revokeObjectURL(wristObjectURL);
+        wristObjectURL = null;
+      }
+
+      if (watchObjectURL) {
+        URL.revokeObjectURL(watchObjectURL);
+        watchObjectURL = null;
+      }
+
+      // Return to starting state
+      status.textContent =
+      "Reset complete. Upload your wrist and watch images to begin.";
+
+    });
     // Download generated preview
     downloadBtn.addEventListener("click", () => {
 

@@ -1,0 +1,605 @@
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Try On Time - Hand Detection</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f5fa;
+      text-align: center;
+      padding: 25px;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: auto;
+      background: white;
+      padding: 25px;
+      border-radius: 12px;
+    }
+
+    h1 {
+      color: #51459c;
+    }
+
+    button {
+      padding: 12px 20px;
+      margin: 10px;
+      border: none;
+      border-radius: 6px;
+      background: #6655b8;
+      color: white;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      background: #aaa;
+      cursor: not-allowed;
+    }
+
+    input {
+      margin: 15px;
+    }
+
+    canvas {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      margin: 20px auto;
+      border: 1px solid #ccc;
+    }
+
+    #status {
+      font-weight: bold;
+      margin: 15px;
+    }
+
+    
+    /* Phase 4 Adjustment Panel */
+
+    #adjustmentPanel {
+      margin-top: 20px;
+      padding: 20px;
+      background: #f0eeff;
+      border-radius: 10px;
+    }
+
+    #adjustmentPanel[hidden] {
+      display: none;
+    }
+
+    #adjustmentPanel label {
+      display: block;
+      margin-top: 15px;
+      font-weight: bold;
+    }
+
+    #adjustmentPanel input[type="range"] {
+      display: block;
+      width: 80%;
+      max-width: 350px;
+      margin: 10px auto;
+    }
+
+    #fitStatus {
+      font-weight: bold;
+    }
+
+  </style>
+</head>
+
+<body>
+
+  <div class="container">
+
+    <h1>TRY ON TIME</h1>
+    <h3>Hand Landmark Detection</h3>
+
+    <button id="loadBtn">Load MediaPipe</button>
+
+    <br>
+
+    <input type="file"
+           id="imageInput"
+           accept="image/*">
+
+    <br>
+
+    <button id="detectBtn" disabled>
+      Detect Hand Landmarks
+    </button>
+
+    <p id="status">Load MediaPipe to begin.</p>
+
+    <canvas id="outputCanvas"></canvas>
+
+    <p id="coordinates"></p>
+
+    
+    <h3>Estimated Watch Placement</h3>
+    <pre id="placementInfo"></pre>
+
+    
+    <!-- Phase 4: Manual Adjustment Controls -->
+
+    <div id="adjustmentPanel" hidden>
+
+      <h3>Adjust Watch Placement</h3>
+
+      <label for="moveX">
+        Horizontal Position: <span id="moveXValue">0</span>%
+      </label>
+      <input type="range" id="moveX"
+            min="-50" max="50" value="0">
+
+      <label for="moveY">
+        Vertical Position: <span id="moveYValue">0</span>%
+      </label>
+      <input type="range" id="moveY"
+            min="-50" max="50" value="0">
+
+      <label for="watchSize">
+        Watch Size: <span id="watchSizeValue">100</span>%
+      </label>
+      <input type="range" id="watchSize"
+            min="60" max="140" value="100">
+
+      <label for="watchAngle">
+        Extra Rotation: <span id="watchAngleValue">0</span>°
+      </label>
+      <input type="range" id="watchAngle"
+            min="-45" max="45" value="0">
+
+      <br>
+
+      <button id="resetAdjustment">
+        Reset Adjustments
+      </button>
+
+      <p id="fitStatus"></p>
+
+    </div>
+
+
+
+  </div>
+
+  <script type="module">
+
+
+        
+    import {
+      initializeHandLandmarker,
+      detectHandLandmarks,
+      calculateWatchPlacement,
+      adjustWatchPlacement,
+      getWatchFitStatus
+    } from "../js/wristDetection.js";
+
+
+
+    const loadBtn = document.getElementById("loadBtn");
+    const detectBtn = document.getElementById("detectBtn");
+    const imageInput = document.getElementById("imageInput");
+
+    const status = document.getElementById("status");
+    const coordinates = document.getElementById("coordinates");
+
+    const canvas = document.getElementById("outputCanvas");
+    const ctx = canvas.getContext("2d");
+
+    let selectedImage = null;
+    let modelReady = false;
+
+    
+    // Phase 4 variables
+    let baseWatch = null;
+    let savedLandmarks = null;
+
+    const adjustmentPanel =
+      document.getElementById("adjustmentPanel");
+
+    const fitStatus =
+      document.getElementById("fitStatus");
+
+    const controls = {
+      moveX: document.getElementById("moveX"),
+      moveY: document.getElementById("moveY"),
+      watchSize: document.getElementById("watchSize"),
+      watchAngle: document.getElementById("watchAngle")
+    };
+
+
+    // Hand skeleton connections
+    const connections = [
+      [0, 1], [1, 2], [2, 3], [3, 4],
+      [0, 5], [5, 6], [6, 7], [7, 8],
+      [5, 9], [9, 10], [10, 11], [11, 12],
+      [9, 13], [13, 14], [14, 15], [15, 16],
+      [13, 17], [17, 18], [18, 19], [19, 20],
+      [0, 17]
+    ];
+
+    const placementInfo = document.getElementById("placementInfo");
+
+    function updateButton() {
+      detectBtn.disabled = !modelReady || !selectedImage;
+    }
+
+    // Load MediaPipe
+    loadBtn.addEventListener("click", async () => {
+
+      loadBtn.disabled = true;
+      status.textContent = "Loading MediaPipe...";
+
+      try {
+        await initializeHandLandmarker();
+
+        modelReady = true;
+        status.textContent = "MediaPipe loaded successfully!";
+
+        updateButton();
+
+      } catch (error) {
+        console.error(error);
+        status.textContent = "Failed to load MediaPipe.";
+        loadBtn.disabled = false;
+      }
+    });
+
+    // Upload image
+    imageInput.addEventListener("change", async (event) => {
+
+      const file = event.target.files[0];
+
+      selectedImage = null;
+      updateButton();
+      coordinates.textContent = "";
+      clearAdjustment();
+
+      if (!file) {
+        return;
+      }
+
+      if (!file.type.startsWith("image/")) {
+        status.textContent = "Please choose an image file.";
+        return;
+      }
+
+      const imageURL = URL.createObjectURL(file);
+
+      try {
+        const image = new Image();
+        image.src = imageURL;
+
+        await image.decode();
+
+        selectedImage = image;
+
+        canvas.width = image.naturalWidth;
+        canvas.height = image.naturalHeight;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(image, 0, 0);
+
+        status.textContent =
+          "Image uploaded. Click Detect Hand Landmarks.";
+
+        updateButton();
+
+      } catch (error) {
+        console.error(error);
+        status.textContent = "Could not open the image.";
+      } finally {
+        URL.revokeObjectURL(imageURL);
+      }
+    });
+
+    // Draw detected landmarks
+    function drawLandmarks(landmarks) {
+
+      const scale = Math.max(1, canvas.width / 600);
+
+      // Draw green hand connections
+      ctx.strokeStyle = "green";
+      ctx.lineWidth = 2 * scale;
+
+      connections.forEach(([start, end]) => {
+
+        const p1 = landmarks[start];
+        const p2 = landmarks[end];
+
+        ctx.beginPath();
+
+        ctx.moveTo(
+          p1.x * canvas.width,
+          p1.y * canvas.height
+        );
+
+        ctx.lineTo(
+          p2.x * canvas.width,
+          p2.y * canvas.height
+        );
+
+        ctx.stroke();
+      });
+
+      // Draw yellow landmark points
+      landmarks.forEach((point, index) => {
+
+        const x = point.x * canvas.width;
+        const y = point.y * canvas.height;
+
+        ctx.beginPath();
+        ctx.arc(x, y, 4 * scale, 0, 2 * Math.PI);
+
+        ctx.fillStyle = index === 0 ? "red" : "yellow";
+        ctx.fill();
+
+        ctx.strokeStyle = "black";
+        ctx.lineWidth = 1 * scale;
+        ctx.stroke();
+      });
+
+      // Highlight wrist landmark 0
+      const wrist = landmarks[0];
+
+      ctx.beginPath();
+
+      ctx.arc(
+        wrist.x * canvas.width,
+        wrist.y * canvas.height,
+        7 * scale,
+        0,
+        2 * Math.PI
+      );
+
+      ctx.fillStyle = "red";
+      ctx.fill();
+
+      ctx.strokeStyle = "white";
+      ctx.lineWidth = 2 * scale;
+      ctx.stroke();
+    }
+
+    
+// Draw estimated watch placement guide
+    function drawWatchGuide(watch) {
+
+      ctx.save();
+
+      // Move drawing origin to watch center
+      ctx.translate(watch.x, watch.y);
+
+      // Rotate to match wrist direction
+      ctx.rotate(watch.angle * Math.PI / 180);
+
+      // Draw watch placement rectangle
+      ctx.strokeStyle = "blue";
+      ctx.lineWidth = Math.max(2, canvas.width / 450);
+
+      ctx.setLineDash([10, 6]);
+
+      ctx.strokeRect(
+        -watch.width / 2,
+        -watch.height / 2,
+        watch.width,
+        watch.height
+      );
+
+      ctx.setLineDash([]);
+
+      // Mark center of the watch
+      ctx.beginPath();
+      ctx.arc(0, 0, 6, 0, 2 * Math.PI);
+      ctx.fillStyle = "blue";
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+        
+    // PHASE 4 - Redraw watch when slider changes
+
+    function redrawWatch() {
+
+      if (!baseWatch || !savedLandmarks || !selectedImage) {
+        return;
+      }
+
+      const adjustments = {
+        horizontalPercent: Number(controls.moveX.value),
+        verticalPercent: Number(controls.moveY.value),
+        scalePercent: Number(controls.watchSize.value),
+        angleDegrees: Number(controls.watchAngle.value)
+      };
+
+      const watch = adjustWatchPlacement(
+        baseWatch,
+        adjustments,
+        canvas.width,
+        canvas.height
+      );
+
+      // Clear previous drawing
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Draw original wrist image again
+      ctx.drawImage(
+        selectedImage,
+        0,
+        0,
+        canvas.width,
+        canvas.height
+      );
+
+      // Draw landmarks and adjusted watch guide
+      drawLandmarks(savedLandmarks);
+      drawWatchGuide(watch);
+
+      // Display wrist coordinates
+      coordinates.textContent =
+        `Wrist Landmark: X = ${watch.wristX}, Y = ${watch.wristY}`;
+
+      // Display current placement
+      placementInfo.textContent =
+        JSON.stringify(watch, null, 2);
+
+      // Update slider labels
+      document.getElementById("moveXValue").textContent =
+        controls.moveX.value;
+
+      document.getElementById("moveYValue").textContent =
+        controls.moveY.value;
+
+      document.getElementById("watchSizeValue").textContent =
+        controls.watchSize.value;
+
+      document.getElementById("watchAngleValue").textContent =
+        controls.watchAngle.value;
+
+      // Check image boundaries
+      const fit = getWatchFitStatus(
+        watch,
+        canvas.width,
+        canvas.height
+      );
+
+      fitStatus.textContent = fit.message;
+      fitStatus.style.color = fit.fits ? "green" : "darkred";
+
+      status.textContent = fit.fits
+        ? "Watch placement ready. You can fine-tune it."
+        : "Placement needs adjustment.";
+
+      console.log("Adjusted Watch Placement:", watch);
+    }
+
+
+    // Update guide whenever a slider moves
+    Object.values(controls).forEach(slider => {
+      slider.addEventListener("input", redrawWatch);
+    });
+
+
+    // Reset controls to automatic estimates
+    document.getElementById("resetAdjustment")
+      .addEventListener("click", () => {
+
+        controls.moveX.value = 0;
+        controls.moveY.value = 0;
+        controls.watchSize.value = 100;
+        controls.watchAngle.value = 0;
+
+        redrawWatch();
+      });
+
+
+    // Clear old adjustment results
+    function clearAdjustment() {
+      baseWatch = null;
+      savedLandmarks = null;
+
+      adjustmentPanel.hidden = true;
+
+      placementInfo.textContent = "";
+      fitStatus.textContent = "";
+    }
+
+
+
+    // Detect hand landmarks
+    detectBtn.addEventListener("click", async () => {
+
+      if (!selectedImage || !modelReady) {
+        return;
+      }
+
+      detectBtn.disabled = true;
+      status.textContent = "Detecting hand...";
+      clearAdjustment();
+
+      try {
+
+        const result =
+          await detectHandLandmarks(selectedImage);
+
+        // Clear previous drawing
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        ctx.drawImage(
+          selectedImage,
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        );
+
+        if (!result.detected) {
+
+          status.textContent =
+            "No hand detected. Try a clearer image.";
+
+          coordinates.textContent = "";
+          return;
+        }
+
+        
+
+        // PHASE 4 - Calculate and prepare placement
+
+        const watch = calculateWatchPlacement(
+          result.landmarks,
+          canvas.width,
+          canvas.height
+        );
+
+        if (!watch) {
+
+          clearAdjustment();
+
+          drawLandmarks(result.landmarks);
+
+          coordinates.textContent = "";
+
+          status.textContent =
+            "Hand detected, but placement could not be calculated.";
+
+          return;
+        }
+
+        // Save original automatic calculation
+        baseWatch = watch;
+        savedLandmarks = result.landmarks;
+
+        // Show adjustment controls
+        adjustmentPanel.hidden = false;
+
+        // Draw initial watch placement
+        redrawWatch();
+
+        console.log("Original Watch Placement:", baseWatch);
+
+
+      } catch (error) {
+
+        console.error(error);
+
+        status.textContent =
+          "Detection failed. Check browser console.";
+
+      } finally {
+        updateButton();
+      }
+    });
+
+  </script>
+
+</body>
+</html>

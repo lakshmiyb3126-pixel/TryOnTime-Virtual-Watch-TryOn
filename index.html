@@ -8,531 +8,992 @@
 
   <title>TRY ON TIME - Virtual Watch Try-On</title>
 
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f3f0ff;
-      padding: 20px;
-      text-align: center;
-    }
-
-    .controls {
-      background: white;
-      max-width: 650px;
-      margin: 20px auto;
-      padding: 25px;
-      border-radius: 12px;
-    }
-
-    h2 {
-      color: #51459c;
-    }
-
-    .control {
-      margin: 18px 0;
-    }
-
-    .control label {
-      display: block;
-      margin-bottom: 8px;
-    }
-
-    input[type="range"] {
-      width: 80%;
-      max-width: 400px;
-    }
-
-    button {
-      background: #6554b3;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      padding: 12px 20px;
-      margin: 6px;
-      cursor: pointer;
-    }
-
-    button:disabled {
-      background: #aaa;
-      cursor: not-allowed;
-    }
-
-    canvas {
-      display: none;
-      width: 100%;
-      max-width: 900px;
-      height: auto;
-      margin: 20px auto;
-      border: 1px solid #ccc;
-      background: white;
-    }
-
-    #status {
-      font-weight: bold;
-      margin-top: 18px;
-    }
-  </style>
+  <link rel="stylesheet" href="style.css">
 </head>
+
 
 <body>
 
-  <h2>TRY ON TIME</h2>
-  <h3>Virtual Watch Try-On</h3>
+    <!-- Website Header -->
+    <header class="site-header">
+        <h1>TRY ON <span>TIME</span></h1>
+        <div class="brand-line"></div>
+        <p>Discover Your Perfect Watch, Virtually</p>
+    </header>
 
-  <div class="controls">
+    <main class="main-container">
 
-    <p>Upload Wrist Image:</p>
-    <input type="file" id="wristUpload"
-           accept="image/jpeg,image/png">
+        <h2 class="section-title">
+            Experience Your Style
+        </h2>
 
-    <p>Upload Watch Image:</p>
-    <input type="file" id="watchUpload"
-           accept="image/png">
+        <p class="section-description">
+            Upload your wrist and watch images to see
+            how your favorite watch looks on you.
+        </p>
 
-    <h3>Adjust Watch Placement</h3>
+        <!-- Upload Section -->
+        <section class="upload-container">
 
-    <div class="control">
-      <label>
-        Horizontal Adjustment:
-        <span id="xValue">0</span>%
-      </label>
-      <input type="range" id="x"
-             min="-100" max="100" value="0">
-    </div>
+            <div class="upload-card wrist-card">
+                <div class="upload-icon">📷</div>
 
-    <div class="control">
-      <label>
-        Vertical Adjustment:
-        <span id="yValue">0</span>%
-      </label>
-      <input type="range" id="y"
-             min="-100" max="100" value="0">
-    </div>
+                <h3>Upload Wrist Image</h3>
 
-    <div class="control">
-      <label>
-        Watch Size:
-        <span id="sizeValue">100</span>%
-      </label>
-      <input type="range" id="size"
-             min="50" max="180" value="100">
-    </div>
+                <p>
+                    Choose a clear image showing your
+                    hand and wrist.
+                </p>
 
-    <div class="control">
-      <label>
-        Extra Rotation:
-        <span id="angleValue">0</span>°
-      </label>
-      <input type="range" id="angle"
-             min="-180" max="180" value="0">
-    </div>
+                <input
+                    type="file"
+                    id="wristUpload"
+                    accept="image/jpeg,image/png"
+                >
+            </div>
 
-    <button id="tryOnBtn">Try On Watch</button>
+            <div class="upload-card watch-card">
+                <div class="upload-icon">⌚</div>
 
-    <button id="downloadBtn" disabled>
-      Download Preview
-    </button>
+                <h3>Upload Watch Image</h3>
 
-    <p id="status">
-      Upload images or use the sample images.
-    </p>
+                <p>
+                    Select a PNG image of the watch
+                    you would like to try on.
+                </p>
 
-  </div>
+                <input
+                    type="file"
+                    id="watchUpload"
+                    accept="image/png"
+                >
+            </div>
 
-  <canvas id="previewCanvas"></canvas>
+        </section>
+
+        <!-- Existing adjustment controls -->
+        <section hidden aria-label="Watch adjustments">
+
+            <input type="range" id="x"
+                   min="-100" max="100" value="0">
+            <span id="xValue">0</span>
+
+            <input type="range" id="y"
+                   min="-100" max="100" value="0">
+            <span id="yValue">0</span>
+
+            <input type="range" id="size"
+                   min="50" max="180" value="100">
+            <span id="sizeValue">100</span>
+
+            <input type="range" id="angle"
+                   min="-180" max="180" value="0">
+            <span id="angleValue">0</span>
+
+        </section>
+
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+
+            <button id="tryOnBtn">
+                ✨ Try On Watch
+            </button>
+
+            <button id="resetBtn" class="secondary-btn">
+                Reset
+            </button>
+
+            
+
+            <button id="downloadBtn" disabled>
+                Download Preview
+            </button>
+
+        </div>
+
+        <!-- Preview Section -->
+        <section class="preview-section">
+
+            <h2>Your Virtual Watch Preview</h2>
+
+            <p>
+                Your selected watch will appear
+                on your wrist here.
+            </p>
+
+            <canvas id="previewCanvas"></canvas>
+
+            <p id="status" role="status" aria-live="polite">
+                Upload your wrist and watch images to begin.
+            </p>
+
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+        TRY ON TIME | Virtual Watch Try-On
+    </footer>
+
+
 
   <!-- Kavana's original watch placement module -->
   <script src="js/watchPlacement.js"></script>
 
   <!-- Your MediaPipe module and integration logic -->
-  <script type="module">
+  
+<script type="module">
+import { detectHandLandmarks } from './js/wristDetection.js';
 
-    import {
-      detectHandLandmarks,
-      calculateWatchPlacement
-    } from "./js/wristDetection.js";
+const $ = id => document.getElementById(id);
+const canvas = $('previewCanvas');
+const status = $('status');
+const tryOnBtn = $('tryOnBtn');
+const resetBtn = $('resetBtn');
+const downloadBtn = $('downloadBtn');
+const wristUpload = $('wristUpload');
+const watchUpload = $('watchUpload');
 
-    const canvas =
-      document.getElementById("previewCanvas");
+let wristSource = 'assets/wrist.jpg';
+let watchSource = 'assets/watch.png';
+let wristObjectURL = null;
+let watchObjectURL = null;
+let generation = 0;
+let busy = false;
+let previewReady = false;
 
-    const status =
-      document.getElementById("status");
+const clamp = (value, low, high) =>
+  Math.max(low, Math.min(high, value));
 
-    const tryOnBtn =
-      document.getElementById("tryOnBtn");
+const median = values => {
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length / 2)];
+};
 
-    const downloadBtn =
-      document.getElementById("downloadBtn");
+function clearPreview(message = 'Preview cleared.') {
+  generation++;
+  previewReady = false;
+  downloadBtn.disabled = true;
+  canvas.style.display = 'none';
 
-    const wristUpload =
-      document.getElementById("wristUpload");
+  canvas.getContext('2d').clearRect(
+    0, 0, canvas.width, canvas.height
+  );
 
-    const watchUpload =
-      document.getElementById("watchUpload");
+  status.textContent = message;
+}
 
-    const controls = ["x", "y", "size", "angle"];
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () =>
+      reject(new Error('Unable to load an image.'));
+    image.src = src;
+  });
+}
 
-    let wristSource = "assets/wrist.jpg";
-    let watchSource = "assets/watch.png";
+// ----------------------------------
+// MediaPipe wrist geometry
+// ----------------------------------
 
-    let wristObjectURL = null;
-    let watchObjectURL = null;
+function getGeometry(landmarks, width, height) {
+  const point = i => ({
+    x: landmarks[i].x * width,
+    y: landmarks[i].y * height
+  });
 
-    let basePlacement = null;
+  const wrist = point(0);
+  const a = point(5);
+  const b = point(9);
+  const c = point(17);
 
-    let previewReady = false;
-    let activeTryOn = false;
-    let requestVersion = 0;
+  const palmCenter = {
+    x: (a.x + b.x + c.x) / 3,
+    y: (a.y + b.y + c.y) / 3
+  };
 
-    function getValue(id) {
-      return Number(document.getElementById(id).value);
+  let dx = wrist.x - palmCenter.x;
+  let dy = wrist.y - palmCenter.y;
+
+  const length = Math.hypot(dx, dy);
+  const palmWidth = Math.hypot(
+    a.x - c.x,
+    a.y - c.y
+  );
+
+  if (length < 5 || palmWidth < 8) {
+    throw new Error(
+      'Could not calculate wrist direction.'
+    );
+  }
+
+  dx /= length;
+  dy /= length;
+
+  return {
+    center: {
+      x: wrist.x + dx * palmWidth * 0.20,
+      y: wrist.y + dy * palmWidth * 0.20
+    },
+    dx,
+    dy,
+    sideX: -dy,
+    sideY: dx,
+    palmWidth
+  };
+}
+
+// ----------------------------------
+// Automatic wrist width estimation
+// ----------------------------------
+
+function estimateWristWidth(
+  image, width, height, geometry
+) {
+  const fallback = {
+    width: geometry.palmWidth * 0.88,
+    label: 'Landmark-based wrist estimate'
+  };
+
+  const scale = Math.min(
+    1, 960 / Math.max(width, height)
+  );
+
+  const w = Math.max(
+    1, Math.round(width * scale)
+  );
+
+  const h = Math.max(
+    1, Math.round(height * scale)
+  );
+
+  const scratch = document.createElement('canvas');
+  scratch.width = w;
+  scratch.height = h;
+
+  const ctx = scratch.getContext('2d', {
+    willReadFrequently: true
+  });
+
+  ctx.drawImage(image, 0, 0, w, h);
+
+  const pixels = ctx.getImageData(
+    0, 0, w, h
+  ).data;
+
+  function pixel(x, y) {
+    const px = Math.round(x * scale);
+    const py = Math.round(y * scale);
+
+    if (
+      px < 2 || py < 2 ||
+      px >= w - 2 || py >= h - 2
+    ) {
+      return null;
     }
 
-    // Update the displayed slider numbers
-    function updateLabels() {
-      controls.forEach(id => {
-        const labelId =
-          id === "size" ? "sizeValue" :
-          id === "angle" ? "angleValue" :
-          id + "Value";
+    let r = 0, g = 0, b = 0;
 
-        document.getElementById(labelId).textContent =
-          getValue(id);
+    for (let yy = -2; yy <= 2; yy++) {
+      for (let xx = -2; xx <= 2; xx++) {
+        const i = (
+          (py + yy) * w + px + xx
+        ) * 4;
+
+        r += pixels[i];
+        g += pixels[i + 1];
+        b += pixels[i + 2];
+      }
+    }
+
+    return [r / 25, g / 25, b / 25];
+  }
+
+  const colorDiff = (a, b) =>
+    Math.hypot(
+      a[0] - b[0],
+      a[1] - b[1],
+      a[2] - b[2]
+    );
+
+  const step = Math.max(
+    2 / scale,
+    geometry.palmWidth * 0.016
+  );
+
+  const measurements = [];
+
+  for (const offset of [0.10, 0.20, 0.30, 0.40]) {
+    const center = {
+      x: geometry.center.x +
+        geometry.dx *
+        geometry.palmWidth *
+        (offset - 0.20),
+
+      y: geometry.center.y +
+        geometry.dy *
+        geometry.palmWidth *
+        (offset - 0.20)
+    };
+
+    const skin = pixel(center.x, center.y);
+
+    if (!skin) continue;
+
+    function edge(sign) {
+      let consecutive = 0;
+
+      for (
+        let distance = geometry.palmWidth * 0.25;
+        distance <= geometry.palmWidth * 1.05;
+        distance += step
+      ) {
+        const sample = pixel(
+          center.x +
+            sign * geometry.sideX * distance,
+
+          center.y +
+            sign * geometry.sideY * distance
+        );
+
+        if (!sample) return null;
+
+        consecutive =
+          colorDiff(sample, skin) > 58
+            ? consecutive + 1
+            : 0;
+
+        if (consecutive === 3) {
+          return distance - 2 * step;
+        }
+      }
+
+      return null;
+    }
+
+    const left = edge(-1);
+    const right = edge(1);
+
+    if (left === null || right === null) {
+      continue;
+    }
+
+    const measured = left + right;
+
+    if (
+      measured < geometry.palmWidth * 0.65 ||
+      measured > geometry.palmWidth * 1.7
+    ) {
+      continue;
+    }
+
+    measurements.push({
+      width: measured,
+      sideShift: (right - left) / 2
+    });
+  }
+
+  if (measurements.length < 2) {
+    return fallback;
+  }
+
+  const widths = measurements.map(
+    item => item.width
+  );
+
+  if (
+    Math.max(...widths) -
+    Math.min(...widths) >
+    geometry.palmWidth * 0.28
+  ) {
+    return fallback;
+  }
+
+  return {
+    width: median(widths),
+
+    sideShift: clamp(
+      median(
+        measurements.map(item => item.sideShift)
+      ),
+      -geometry.palmWidth * 0.08,
+      geometry.palmWidth * 0.08
+    ),
+
+    label: 'Wrist edges + MediaPipe'
+  };
+}
+
+// ----------------------------------
+// Watch PNG processing
+// ----------------------------------
+
+function analyzeWatch(image) {
+  const scale = Math.min(
+    1,
+    1200 / Math.max(
+      image.naturalWidth,
+      image.naturalHeight
+    )
+  );
+
+  const width = Math.max(
+    1,
+    Math.round(image.naturalWidth * scale)
+  );
+
+  const height = Math.max(
+    1,
+    Math.round(image.naturalHeight * scale)
+  );
+
+  const temp = document.createElement('canvas');
+  temp.width = width;
+  temp.height = height;
+
+  const ctx = temp.getContext('2d', {
+    willReadFrequently: true
+  });
+
+  ctx.drawImage(image, 0, 0, width, height);
+
+  const pixels = ctx.getImageData(
+    0, 0, width, height
+  ).data;
+
+  let minX = width;
+  let minY = height;
+  let maxX = -1;
+  let maxY = -1;
+  let transparent = 0;
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const alpha = pixels[
+        (y * width + x) * 4 + 3
+      ];
+
+      if (alpha < 25) {
+        transparent++;
+      }
+
+      if (alpha > 70) {
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+        minY = Math.min(minY, y);
+        maxY = Math.max(maxY, y);
+      }
+    }
+  }
+
+  if (maxX < 0) {
+    throw new Error('The watch PNG is blank.');
+  }
+
+  if (transparent < width * height * 0.01) {
+    throw new Error(
+      'Please use a watch PNG with a transparent background.'
+    );
+  }
+
+  // Remove transparent outer margins
+  const cropped = document.createElement('canvas');
+
+  cropped.width = maxX - minX + 1;
+  cropped.height = maxY - minY + 1;
+
+  cropped.getContext('2d').drawImage(
+    temp,
+    minX,
+    minY,
+    cropped.width,
+    cropped.height,
+    0,
+    0,
+    cropped.width,
+    cropped.height
+  );
+
+  // Normalize horizontal watch images
+  let vertical = cropped;
+
+  if (cropped.width > cropped.height) {
+    vertical = document.createElement('canvas');
+
+    vertical.width = cropped.height;
+    vertical.height = cropped.width;
+
+    const rotate = vertical.getContext('2d');
+
+    rotate.translate(
+      vertical.width / 2,
+      vertical.height / 2
+    );
+
+    rotate.rotate(Math.PI / 2);
+
+    rotate.drawImage(
+      cropped,
+      -cropped.width / 2,
+      -cropped.height / 2
+    );
+  }
+
+  // Estimate the watch-case region
+  const array = vertical.getContext('2d', {
+    willReadFrequently: true
+  }).getImageData(
+    0, 0,
+    vertical.width,
+    vertical.height
+  ).data;
+
+  const rows = [];
+
+  for (let y = 0; y < vertical.height; y++) {
+    let left = vertical.width;
+    let right = -1;
+
+    for (let x = 0; x < vertical.width; x++) {
+      if (
+        array[
+          (y * vertical.width + x) * 4 + 3
+        ] > 90
+      ) {
+        left = Math.min(left, x);
+        right = Math.max(right, x);
+      }
+    }
+
+    rows.push(
+      right >= left ? right - left + 1 : 0
+    );
+  }
+
+  const caseWidth = Math.max(...rows);
+  const groups = [];
+
+  let start = -1;
+
+  for (let y = 0; y <= rows.length; y++) {
+    const wide =
+      y < rows.length &&
+      rows[y] >= caseWidth * 0.76;
+
+    if (wide && start < 0) {
+      start = y;
+    }
+
+    if (!wide && start >= 0) {
+      groups.push({
+        start,
+        end: y - 1,
+        length: y - start
       });
+
+      start = -1;
+    }
+  }
+
+  groups.sort(
+    (a, b) => b.length - a.length
+  );
+
+  const region = groups[0];
+
+  const dialY =
+    region &&
+    region.length >= vertical.height * 0.04
+      ? (region.start + region.end) / 2
+      : vertical.height / 2;
+
+  return {
+    canvas: vertical,
+    caseWidth,
+    dialY
+  };
+}
+
+// ----------------------------------
+// Automatic size, position, rotation
+// ----------------------------------
+
+function drawWatch(
+  ctx, analyzed, geometry, measurement
+) {
+  const wristWidth = measurement.width;
+  const watch = analyzed.canvas;
+
+  const caseDisplayWidth =
+    wristWidth * 0.61;
+
+  const scale =
+    caseDisplayWidth / analyzed.caseWidth;
+
+  const watchWidth = watch.width * scale;
+  const watchHeight = watch.height * scale;
+
+  const maxLength =
+    wristWidth * 1.04;
+
+  const x =
+    geometry.center.x +
+    geometry.sideX *
+    (measurement.sideShift || 0);
+
+  const y =
+    geometry.center.y +
+    geometry.sideY *
+    (measurement.sideShift || 0);
+
+  // Keep the tested rotation
+  let angle = Math.atan2(
+    geometry.dy,
+    geometry.dx
+  );
+
+  while (angle > Math.PI / 2) {
+    angle -= Math.PI;
+  }
+
+  while (angle < -Math.PI / 2) {
+    angle += Math.PI;
+  }
+
+  // Draw the watch into a temporary canvas
+  const band = document.createElement('canvas');
+
+  band.width = Math.max(
+    1,
+    Math.ceil(watchWidth + 4)
+  );
+
+  band.height = Math.max(
+    1,
+    Math.ceil(
+      Math.min(watchHeight, maxLength) + 4
+    )
+  );
+
+  const bandCtx = band.getContext('2d');
+
+  const left =
+    (band.width - watchWidth) / 2;
+
+  const top =
+    band.height / 2 -
+    analyzed.dialY * scale;
+
+  bandCtx.drawImage(
+    watch,
+    left,
+    top,
+    watchWidth,
+    watchHeight
+  );
+
+  // Soften the outer strap ends
+  const feather = band.height * 0.07;
+
+  bandCtx.globalCompositeOperation =
+    'destination-in';
+
+  const mask = bandCtx.createLinearGradient(
+    0, 0, 0, band.height
+  );
+
+  mask.addColorStop(
+    0,
+    'rgba(0,0,0,0)'
+  );
+
+  mask.addColorStop(
+    feather / band.height,
+    'rgba(0,0,0,1)'
+  );
+
+  mask.addColorStop(
+    1 - feather / band.height,
+    'rgba(0,0,0,1)'
+  );
+
+  mask.addColorStop(
+    1,
+    'rgba(0,0,0,0)'
+  );
+
+  bandCtx.fillStyle = mask;
+
+  bandCtx.fillRect(
+    0, 0,
+    band.width,
+    band.height
+  );
+
+  bandCtx.globalCompositeOperation =
+    'source-over';
+
+  // Overlay the watch at the calculated wrist position
+  ctx.save();
+
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+
+  ctx.drawImage(
+    band,
+    -band.width / 2,
+    -band.height / 2
+  );
+
+  ctx.restore();
+}
+
+// ----------------------------------
+// Generate virtual watch preview
+// ----------------------------------
+
+async function startTryOn() {
+  if (busy) return;
+
+  busy = true;
+  tryOnBtn.disabled = true;
+
+  clearPreview('Loading images...');
+  const token = generation;
+
+  try {
+    const [wrist, watch] = await Promise.all([
+      loadImage(wristSource),
+      loadImage(watchSource)
+    ]);
+
+    if (token !== generation) return;
+
+    status.textContent =
+      'Detecting wrist using MediaPipe...';
+
+    const result =
+      await detectHandLandmarks(wrist);
+
+    if (token !== generation) return;
+
+    if (
+      !result?.detected ||
+      !Array.isArray(result.landmarks)
+    ) {
+      throw new Error(
+        'No hand detected. Upload a clear hand and wrist image.'
+      );
     }
 
-    // Restore automatic placement settings
-    function resetSliders() {
-      document.getElementById("x").value = 0;
-      document.getElementById("y").value = 0;
-      document.getElementById("size").value = 100;
-      document.getElementById("angle").value = 0;
+    const scale = Math.min(
+      1,
+      1500 / Math.max(
+        wrist.naturalWidth,
+        wrist.naturalHeight
+      )
+    );
 
-      updateLabels();
+    const width = Math.round(
+      wrist.naturalWidth * scale
+    );
+
+    const height = Math.round(
+      wrist.naturalHeight * scale
+    );
+
+    // Wrist geometry
+    const geometry = getGeometry(
+      result.landmarks,
+      width,
+      height
+    );
+
+    status.textContent =
+      'Calculating automatic watch fit...';
+
+    // Automatic measurements
+    const measurement = estimateWristWidth(
+      wrist,
+      width,
+      height,
+      geometry
+    );
+
+    const analyzed = analyzeWatch(watch);
+
+    if (
+      geometry.center.x < 0 ||
+      geometry.center.x >= width ||
+      geometry.center.y < 0 ||
+      geometry.center.y >= height
+    ) {
+      throw new Error(
+        'Wrist is too close to the edge of the image.'
+      );
     }
 
-    // Clear an earlier try-on
-    function clearPreview(message = "Preview cleared.") {
+    // Render without disturbing previous preview
+    const tempCanvas =
+      document.createElement('canvas');
 
-      requestVersion++;
+    tempCanvas.width = width;
+    tempCanvas.height = height;
 
-      previewReady = false;
-      activeTryOn = false;
-      basePlacement = null;
+    const tempCtx = tempCanvas.getContext('2d');
 
-      downloadBtn.disabled = true;
-      tryOnBtn.disabled = false;
+    tempCtx.drawImage(
+      wrist,
+      0,
+      0,
+      width,
+      height
+    );
 
-      canvas.style.display = "none";
+    drawWatch(
+      tempCtx,
+      analyzed,
+      geometry,
+      measurement
+    );
 
-      const ctx = canvas.getContext("2d");
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (token !== generation) return;
 
-      resetSliders();
+    canvas.width = width;
+    canvas.height = height;
 
-      status.textContent = message;
+    canvas.getContext('2d').drawImage(
+      tempCanvas,
+      0,
+      0
+    );
+
+    canvas.style.display = 'block';
+    previewReady = true;
+    downloadBtn.disabled = false;
+
+    status.textContent =
+      'Watch placed automatically!';
+
+  } catch (error) {
+    if (token === generation) {
+      status.textContent = error.message;
+      console.error(error);
+    }
+  } finally {
+    busy = false;
+    tryOnBtn.disabled = false;
+  }
+}
+
+// ----------------------------------
+// Frontend button functionality
+// ----------------------------------
+
+tryOnBtn.addEventListener('click', () => {
+  if (previewReady) {
+    clearPreview(
+      'Previous preview cleared. Select another image or try again.'
+    );
+    return;
+  }
+
+  startTryOn();
+});
+
+resetBtn.addEventListener('click', () => {
+  clearPreview(
+    'Reset complete. Upload wrist and watch images to begin.'
+  );
+
+  wristUpload.value = '';
+  watchUpload.value = '';
+
+  wristSource = 'assets/wrist.jpg';
+  watchSource = 'assets/watch.png';
+
+  if (wristObjectURL) {
+    URL.revokeObjectURL(wristObjectURL);
+  }
+
+  if (watchObjectURL) {
+    URL.revokeObjectURL(watchObjectURL);
+  }
+
+  wristObjectURL = null;
+  watchObjectURL = null;
+});
+
+downloadBtn.addEventListener('click', () => {
+  if (!previewReady) return;
+
+  const link = document.createElement('a');
+
+  link.href = canvas.toDataURL('image/png');
+  link.download = 'try-on-time-preview.png';
+
+  link.click();
+});
+
+// ----------------------------------
+// Upload handling
+// ----------------------------------
+
+function handleUpload(kind, input) {
+  const file = input.files[0];
+
+  if (!file) return;
+
+  clearPreview(
+    'New image selected. Click Try On Watch.'
+  );
+
+  const accepted =
+    kind === 'wrist'
+      ? ['image/jpeg', 'image/png']
+      : ['image/png'];
+
+  if (!accepted.includes(file.type)) {
+    status.textContent =
+      kind === 'wrist'
+        ? 'Select a JPG or PNG wrist image.'
+        : 'Select a transparent PNG watch image.';
+
+    input.value = '';
+    return;
+  }
+
+  const url = URL.createObjectURL(file);
+
+  if (kind === 'wrist') {
+    if (wristObjectURL) {
+      URL.revokeObjectURL(wristObjectURL);
     }
 
-    // Combine MediaPipe placement with manual adjustments
-    function getAdjustedPlacement() {
-
-      const x = basePlacement.x +
-        basePlacement.width * getValue("x") / 100;
-
-      const y = basePlacement.y +
-        basePlacement.width * getValue("y") / 100;
-
-      const width = basePlacement.width *
-        getValue("size") / 100;
-
-      const angleDegrees =
-        basePlacement.angle + getValue("angle");
-
-      return {
-        x: x,
-        y: y,
-        width: width,
-
-        // Kavana's module requires radians
-        angle: angleDegrees * Math.PI / 180
-      };
+    wristObjectURL = url;
+    wristSource = url;
+  } else {
+    if (watchObjectURL) {
+      URL.revokeObjectURL(watchObjectURL);
     }
 
-    // Draw the actual watch using Kavana's module
-    async function renderPreview() {
+    watchObjectURL = url;
+    watchSource = url;
+  }
+}
 
-      if (!basePlacement || !activeTryOn) {
-        return;
-      }
+wristUpload.addEventListener('change', () => {
+  handleUpload('wrist', wristUpload);
+});
 
-      const currentRequest = ++requestVersion;
+watchUpload.addEventListener('change', () => {
+  handleUpload('watch', watchUpload);
+});
 
-      downloadBtn.disabled = true;
+</script>
 
-      status.textContent = "Updating watch preview...";
-
-      try {
-
-        const wristData = getAdjustedPlacement();
-
-        // Generate off-screen first to avoid flickering
-        const temporaryCanvas =
-          document.createElement("canvas");
-
-        await window.placeWatch(
-          temporaryCanvas,
-          wristSource,
-          watchSource,
-          wristData
-        );
-
-        // Ignore outdated slider results
-        if (currentRequest !== requestVersion) {
-          return;
-        }
-
-        canvas.width = temporaryCanvas.width;
-        canvas.height = temporaryCanvas.height;
-
-        const ctx = canvas.getContext("2d");
-
-        ctx.drawImage(temporaryCanvas, 0, 0);
-
-        canvas.style.display = "block";
-
-        previewReady = true;
-        downloadBtn.disabled = false;
-
-        status.textContent =
-          "Watch placed successfully! Adjust if needed.";
-
-      } catch (error) {
-
-        if (currentRequest === requestVersion) {
-          status.textContent = error.message;
-          console.error(error);
-        }
-      }
-    }
-
-    // Detect the wrist and begin a new try-on
-    async function startTryOn() {
-
-      const currentRequest = ++requestVersion;
-
-      tryOnBtn.disabled = true;
-      status.textContent =
-        "Detecting wrist using MediaPipe...";
-
-      try {
-
-        const wristImage =
-          await window.loadImage(wristSource);
-
-        if (currentRequest !== requestVersion) {
-          return;
-        }
-
-        // Your Phase 2 hand detection
-        const result =
-          await detectHandLandmarks(wristImage);
-
-        if (currentRequest !== requestVersion) {
-          return;
-        }
-
-        if (!result.detected) {
-          throw new Error(
-            "No hand detected. Upload a clearer photo showing the hand and wrist."
-          );
-        }
-
-        // Your Phase 3 watch position calculation
-        const placement = calculateWatchPlacement(
-          result.landmarks,
-          wristImage.naturalWidth,
-          wristImage.naturalHeight
-        );
-
-        if (!placement) {
-          throw new Error(
-            "Could not calculate watch position."
-          );
-        }
-
-        basePlacement = placement;
-        activeTryOn = true;
-
-        console.log("MediaPipe placement:", basePlacement);
-
-        tryOnBtn.disabled = false;
-
-        // Kavana's watch overlay
-        await renderPreview();
-
-      } catch (error) {
-
-        if (currentRequest === requestVersion) {
-          status.textContent = error.message;
-          console.error(error);
-        }
-
-      } finally {
-        tryOnBtn.disabled = false;
-      }
-    }
-
-    // Sliders update without repeating MediaPipe detection
-    controls.forEach(id => {
-
-      const slider = document.getElementById(id);
-
-      slider.addEventListener("input", () => {
-
-        updateLabels();
-
-        if (activeTryOn && basePlacement) {
-          renderPreview();
-        }
-      });
-    });
-
-    // Try On button
-    tryOnBtn.addEventListener("click", async () => {
-
-      if (activeTryOn || previewReady) {
-
-        clearPreview(
-          "Previous preview cleared. Choose another watch or wrist image."
-        );
-
-        wristUpload.value = "";
-        watchUpload.value = "";
-
-        return;
-      }
-
-      await startTryOn();
-    });
-
-    // Download generated preview
-    downloadBtn.addEventListener("click", () => {
-
-      if (!previewReady || downloadBtn.disabled) {
-        return;
-      }
-
-      const link = document.createElement("a");
-
-      link.href = canvas.toDataURL("image/png");
-      link.download = "virtual-watch-preview.png";
-
-      link.click();
-    });
-
-    // Upload wrist image
-    wristUpload.addEventListener("change", async () => {
-
-      const file = wristUpload.files[0];
-
-      if (!file) return;
-
-      clearPreview("Loading new wrist image...");
-
-      if (!["image/png", "image/jpeg"].includes(file.type)) {
-        status.textContent = "Select a JPG or PNG image.";
-        wristUpload.value = "";
-        return;
-      }
-
-      const currentRequest = requestVersion;
-      const newURL = URL.createObjectURL(file);
-
-      try {
-
-        await window.loadImage(newURL);
-
-        if (currentRequest !== requestVersion) {
-          URL.revokeObjectURL(newURL);
-          return;
-        }
-
-        const oldURL = wristObjectURL;
-
-        wristObjectURL = newURL;
-        wristSource = newURL;
-
-        if (oldURL) {
-          URL.revokeObjectURL(oldURL);
-        }
-
-        status.textContent =
-          "New wrist uploaded. Click Try On Watch.";
-
-      } catch (error) {
-
-        URL.revokeObjectURL(newURL);
-
-        if (currentRequest === requestVersion) {
-          status.textContent =
-            "Could not load wrist image.";
-        }
-      }
-    });
-
-    // Upload watch image
-    watchUpload.addEventListener("change", async () => {
-
-      const file = watchUpload.files[0];
-
-      if (!file) return;
-
-      clearPreview("Loading new watch image...");
-
-      if (file.type !== "image/png") {
-        status.textContent = "Select a PNG watch image.";
-        watchUpload.value = "";
-        return;
-      }
-
-      const currentRequest = requestVersion;
-      const newURL = URL.createObjectURL(file);
-
-      try {
-
-        await window.loadImage(newURL);
-
-        if (currentRequest !== requestVersion) {
-          URL.revokeObjectURL(newURL);
-          return;
-        }
-
-        const oldURL = watchObjectURL;
-
-        watchObjectURL = newURL;
-        watchSource = newURL;
-
-        if (oldURL) {
-          URL.revokeObjectURL(oldURL);
-        }
-
-        status.textContent =
-          "New watch uploaded. Click Try On Watch.";
-
-      } catch (error) {
-
-        URL.revokeObjectURL(newURL);
-
-        if (currentRequest === requestVersion) {
-          status.textContent =
-            "Could not load watch image.";
-        }
-      }
-    });
-
-    updateLabels();
-
-  </script>
 
 </body>
 </html>

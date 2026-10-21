@@ -1,0 +1,590 @@
+
+/* ======================================
+   TRY ON TIME - Premium Frontend Design
+   Lakshmi G Y
+====================================== */
+
+
+:root {
+    --purple: #7145dc;
+    --dark-purple: #292044;
+    --pink: #ff62a6;
+    --gold: #f5b83d;
+    --mint: #27c9b4;
+    --blue: #4285f4;
+    --ivory: #fffaf6;
+    --white: #ffffff;
+    --text: #29243b;
+    --muted: #696578;
+    --border: #e8ddf6;
+}
+
+
+* {
+    box-sizing: border-box;
+}
+
+
+body {
+    margin: 0;
+    font-family: "Segoe UI", Arial, sans-serif;
+    color: var(--text);
+
+    background:
+        radial-gradient(circle at 5% 10%,
+            #ffd0e5 0%, transparent 35%),
+        radial-gradient(circle at 95% 20%,
+            #c8dfff 0%, transparent 38%),
+        radial-gradient(circle at 50% 90%,
+            #bff7e8 0%, transparent 42%),
+        #fffaf6;
+
+    min-height: 100vh;
+}
+
+
+/* HEADER */
+
+.site-header {
+    width: 100%;
+    padding: 48px 20px;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+
+    background: #29213f;
+    border-bottom: 4px solid #f5c76d;
+}
+
+.site-header h1 {
+    margin: 0;
+    font-size: 42px;
+    letter-spacing: 4px;
+    font-weight: 750;
+    color: #ffffff;
+    text-align: center;
+}
+
+.site-header h1 span {
+    color: #f5c76d;
+}
+
+.site-header p {
+    margin: 8px 0;
+    color: #e5d9ff;
+    font-size: 16px;
+    letter-spacing: 1px;
+    text-align: center;
+}
+
+.brand-line {
+    width: 75px;
+    height: 3px;
+    margin: 17px auto;
+    border-radius: 5px;
+
+    background: linear-gradient(
+        to right,
+        #ff63a3,
+        #f5c76d,
+        #27c9b4
+    );
+}
+
+
+/* MAIN CONTENT */
+
+.main-container {
+    max-width: 1150px;
+    margin: 45px auto;
+    padding: 0 22px;
+}
+
+.section-title {
+    text-align: center;
+    font-size: 29px;
+    margin-bottom: 10px;
+    color: var(--dark-purple);
+}
+
+.section-description {
+    text-align: center;
+    color: var(--muted);
+    font-size: 15px;
+    margin-bottom: 35px;
+}
+
+/* UPLOAD CARDS */
+
+.upload-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 25px;
+}
+
+.upload-card {
+    background: rgba(255, 255, 255, 0.96);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 35px 28px;
+    text-align: center;
+    box-shadow: 0 12px 35px rgba(51, 38, 77, 0.07);
+    transition: transform 0.25s, box-shadow 0.25s;
+}
+
+.upload-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 18px 40px rgba(51, 38, 77, 0.12);
+}
+
+.wrist-card {
+    border-top: 4px solid var(--pink);
+}
+
+.watch-card {
+    border-top: 4px solid var(--mint);
+}
+
+.upload-icon {
+    width: 65px;
+    height: 65px;
+    margin: 0 auto 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 18px;
+    background: #f8e9f0;
+    font-size: 30px;
+}
+
+.watch-card .upload-icon {
+    background: #e8f6f2;
+}
+
+.upload-card h3 {
+    margin: 10px 0;
+    font-size: 20px;
+    color: var(--dark-purple);
+}
+
+.upload-card p {
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.upload-card input[type="file"] {
+    width: 100%;
+    max-width: 310px;
+    margin-top: 18px;
+    color: var(--muted);
+    font-size: 13px;
+}
+
+/* ACTION BUTTONS */
+
+.action-buttons {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 13px;
+    margin: 35px 0;
+}
+
+button {
+    border: none;
+    border-radius: 11px;
+    padding: 14px 27px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+button:hover:not(:disabled) {
+    transform: translateY(-3px);
+    box-shadow: 0 7px 17px rgba(49, 39, 70, 0.16);
+}
+
+button:disabled {
+    background: #c9c5ce !important;
+    color: #ffffff !important;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+}
+
+#tryOnBtn {
+    color: white;
+    background: linear-gradient(
+        120deg,
+        var(--purple),
+        #ac75a8
+    );
+}
+
+#resetBtn {
+    background: #f9e3e7;
+    color: #a34e69;
+}
+
+#compareBtn {
+    background: #e4effd;
+    color: #3d6d9e;
+}
+
+#downloadBtn {
+    background: linear-gradient(
+        120deg,
+        #c49b56,
+        #e3c48e
+    );
+    color: #382d20;
+}
+
+/* PREVIEW SECTION */
+
+.preview-section {
+    background: rgba(255, 255, 255, 0.96);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    padding: 35px;
+    margin-top: 30px;
+    text-align: center;
+    box-shadow: 0 12px 35px rgba(51, 38, 77, 0.06);
+}
+
+.preview-section h2 {
+    color: var(--dark-purple);
+    font-size: 24px;
+    margin-top: 0;
+}
+
+.preview-section p {
+    color: var(--muted);
+}
+
+#previewCanvas {
+    display: none;
+    width: 100%;
+    max-width: 750px;
+    height: auto;
+    margin: 25px auto;
+    border-radius: 15px;
+    border: 1px solid var(--border);
+}
+
+#status {
+    text-align: center;
+    margin: 20px auto;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--purple);
+}
+
+/* FOOTER */
+
+.site-footer {
+    text-align: center;
+    padding: 30px 15px;
+    margin-top: 45px;
+    font-size: 13px;
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+    background: linear-gradient(
+        90deg,
+        #fbebf1,
+        #f9f7fc,
+        #ebf5f4
+    );
+}
+
+/* RESPONSIVE DESIGN */
+
+@media (max-width: 750px) {
+    .upload-container {
+        grid-template-columns: 1fr;
+    }
+
+    .site-header h1 {
+        font-size: 29px;
+        letter-spacing: 2px;
+    }
+
+    .main-container {
+        margin: 25px auto;
+        padding: 0 15px;
+    }
+
+    .section-title {
+        font-size: 24px;
+    }
+
+    .upload-card {
+        padding: 25px 18px;
+    }
+
+    .preview-section {
+        padding: 20px 15px;
+    }
+
+    button {
+        padding: 12px 18px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    button,
+    .upload-card {
+        transition: none;
+    }
+}
+
+/* Bright Premium Finishing Touches */
+
+.site-header {
+    background: linear-gradient(
+        115deg,
+        #eee2ff,
+        #ffe0ed,
+        #fff0cb
+    );
+}
+
+.site-header h1 {
+    color: #392362;
+}
+
+.site-header h1 span {
+    color: #e18b12;
+}
+
+.wrist-card {
+    border-top: 5px solid #ff62a6;
+}
+
+.watch-card {
+    border-top: 5px solid #27c9b4;
+}
+
+.wrist-card .upload-icon {
+    background: #ffe0ed;
+}
+
+.watch-card .upload-icon {
+    background: #d6faf1;
+}
+
+#tryOnBtn {
+    background: linear-gradient(
+        120deg,
+        #7145dc,
+        #ff62a6
+    );
+    color: white;
+}
+
+#resetBtn {
+    background: #ffdfeb;
+    color: #a32463;
+}
+
+#downloadBtn {
+    background: linear-gradient(
+        120deg,
+        #ffbd45,
+        #ffd87e
+    );
+    color: #493008;
+}
+
+.preview-section {
+    border-top: 5px solid #7145dc;
+}
+
+.site-footer {
+    background: linear-gradient(
+        90deg,
+        #e8dcff,
+        #ffdce9,
+        #d5f8ed
+    );
+}
+
+/* ==========================================
+   TRY ON TIME - DARK & LIGHT PREMIUM THEME
+========================================== */
+
+/* Dark premium header */
+
+.site-header {
+    background: linear-gradient(
+        120deg,
+        #211b36 0%,
+        #392b61 55%,
+        #59417e 100%
+    );
+    border-bottom: 4px solid #e7b65a;
+    padding: 48px 20px;
+}
+
+.site-header h1 {
+    color: #ffffff;
+    font-size: 42px;
+    letter-spacing: 4px;
+}
+
+.site-header h1 span {
+    color: #f5c76d;
+}
+
+.site-header p {
+    color: #e5d9ff;
+    font-size: 16px;
+}
+
+.brand-line {
+    background: linear-gradient(
+        90deg,
+        #ff63a3,
+        #e7b65a,
+        #27d4ba
+    );
+}
+
+/* Balanced light background */
+
+body {
+    background:
+        radial-gradient(
+            circle at 0% 35%,
+            #eadfff 0%,
+            transparent 35%
+        ),
+        radial-gradient(
+            circle at 100% 70%,
+            #ccecf0 0%,
+            transparent 40%
+        ),
+        #f5f2fc;
+    color: #29243b;
+}
+
+/* Stronger main heading */
+
+.section-title {
+    color: #30234d;
+    font-size: 32px;
+    font-weight: 750;
+}
+
+/* Light colorful upload cards */
+
+.upload-card {
+    background: #ffffff;
+    border-radius: 20px;
+    box-shadow: 0 12px 30px rgba(28, 20, 52, 0.12);
+}
+
+.wrist-card {
+    border: 1px solid #f6b2d1;
+    border-top: 6px solid #ef478e;
+    background: linear-gradient(
+        145deg,
+        #ffffff,
+        #fff0f6
+    );
+}
+
+.watch-card {
+    border: 1px solid #93ddd3;
+    border-top: 6px solid #16ad9c;
+    background: linear-gradient(
+        145deg,
+        #ffffff,
+        #e9faf6
+    );
+}
+
+.upload-card h3 {
+    color: #30234d;
+}
+
+/* Bright action buttons */
+
+#tryOnBtn {
+    background: linear-gradient(
+        120deg,
+        #6943d1,
+        #d94f9b
+    );
+    color: #ffffff;
+}
+
+#resetBtn {
+    background: #ffe2ec;
+    color: #9c2457;
+    border: 1px solid #f3b4ca;
+}
+
+#downloadBtn {
+    background: linear-gradient(
+        120deg,
+        #e9ac36,
+        #ffd778
+    );
+    color: #38250d;
+}
+
+/* Dark preview header, light preview body */
+
+.preview-section {
+    background: #ffffff;
+    border: 1px solid #d6c9ec;
+    border-top: 6px solid #6943d1;
+    box-shadow: 0 15px 35px rgba(28, 20, 52, 0.12);
+}
+
+.preview-section h2 {
+    color: #30234d;
+}
+
+/* Status message */
+
+#status {
+    color: #53388d;
+    font-weight: 600;
+}
+
+/* Premium dark footer */
+
+.site-footer {
+    background: linear-gradient(
+        120deg,
+        #211b36,
+        #3c2d60
+    );
+    color: #f0e8ff;
+    border-top: 3px solid #e7b65a;
+    padding: 32px 15px;
+}
+
+/* Mobile adjustments */
+
+@media (max-width: 750px) {
+    .site-header h1 {
+        font-size: 30px;
+    }
+
+    .site-header {
+        padding: 35px 15px;
+    }
+
+    .section-title {
+        font-size: 25px;
+    }
+}

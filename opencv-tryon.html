@@ -1,0 +1,1056 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1">
+
+  <title>TRY ON TIME | Automatic Watch Fit Test</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 25px 14px;
+      font: 16px Arial, sans-serif;
+      text-align: center;
+      background: #f2efff;
+      color: #27223f;
+    }
+
+    h1 {
+      color: #5e4ea5;
+      margin-bottom: 4px;
+    }
+
+    .panel {
+      max-width: 720px;
+      padding: 24px;
+      margin: 22px auto;
+      background: white;
+      border-radius: 14px;
+    }
+
+    .inputs {
+      display: grid;
+      gap: 16px;
+      grid-template-columns:
+        repeat(auto-fit, minmax(230px, 1fr));
+      text-align: left;
+    }
+
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    input[type=file] {
+      width: 100%;
+    }
+
+    button {
+      margin: 18px 6px 0;
+      padding: 12px 20px;
+      background: #6554b3;
+      color: white;
+      border: 0;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      background: #a9a6b4;
+      cursor: not-allowed;
+    }
+
+    #status {
+      min-height: 25px;
+      margin: 18px 0 4px;
+      font-weight: 600;
+    }
+
+    #details {
+      color: #666;
+      font-size: 14px;
+    }
+
+    #previewCanvas {
+      display: none;
+      max-width: min(100%, 1100px);
+      height: auto;
+      margin: 18px auto;
+      border-radius: 9px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h1>TRY ON TIME</h1>
+  <p>Automatic wristwatch placement</p>
+
+  <div class="panel">
+
+    <div class="inputs">
+
+      <div>
+        <label for="wristUpload">
+          Wrist photo (JPG/PNG)
+        </label>
+
+        <input
+          id="wristUpload"
+          type="file"
+          accept="image/jpeg,image/png">
+      </div>
+
+      <div>
+        <label for="watchUpload">
+          Watch cutout (transparent PNG)
+        </label>
+
+        <input
+          id="watchUpload"
+          type="file"
+          accept="image/png">
+      </div>
+
+    </div>
+
+    <button id="tryOnBtn">
+      Try On Watch
+    </button>
+
+    <button id="downloadBtn" disabled>
+      Download Preview
+    </button>
+
+    <p id="status">
+      Upload images, or test with sample images.
+    </p>
+
+    <p id="details"></p>
+
+  </div>
+
+  <canvas id="previewCanvas"></canvas>
+
+  <script type="module">
+
+    import {
+      detectHandLandmarks
+    } from './js/wristDetection.js';
+
+    const $ = id => document.getElementById(id);
+
+    const preview = $('previewCanvas');
+    const status = $('status');
+    const details = $('details');
+
+    const tryOnBtn = $('tryOnBtn');
+    const downloadBtn = $('downloadBtn');
+
+    const sources = {
+      wrist: 'assets/wrist.jpg',
+      watch: 'assets/watch.png'
+    };
+
+    const objectURLs = {
+      wrist: null,
+      watch: null
+    };
+
+    let currentRun = 0;
+    let busy = false;
+    let ready = false;
+
+    const clamp = (value, min, max) =>
+      Math.max(min, Math.min(max, value));
+
+    const median = list => {
+      const a = [...list].sort((x, y) => x - y);
+      return a[Math.floor(a.length / 2)];
+    };
+
+    // Reset old result
+    function reset(text) {
+
+      currentRun++;
+
+      ready = false;
+
+      preview.style.display = 'none';
+      downloadBtn.disabled = true;
+
+      details.textContent = '';
+      status.textContent = text;
+    }
+
+    // Load image
+    function loadImage(src) {
+
+      return new Promise((resolve, reject) => {
+
+        const img = new Image();
+
+        img.onload = () => resolve(img);
+
+        img.onerror = () => reject(
+          new Error('Could not open the selected image.')
+        );
+
+        img.src = src;
+      });
+    }
+
+    // Handle image uploads
+    function setUpload(kind, file) {
+
+      if (!file) return;
+
+      const valid = kind === 'watch'
+        ? ['image/png']
+        : ['image/jpeg', 'image/png'];
+
+      if (!valid.includes(file.type)) {
+
+        status.textContent = kind === 'watch'
+          ? 'Choose a PNG watch image.'
+          : 'Choose a JPG or PNG wrist photo.';
+
+        return;
+      }
+
+      reset('New image selected. Click Try On Watch.');
+
+      if (objectURLs[kind]) {
+        URL.revokeObjectURL(objectURLs[kind]);
+      }
+
+      objectURLs[kind] = URL.createObjectURL(file);
+      sources[kind] = objectURLs[kind];
+    }
+
+    $('wristUpload').addEventListener('change', e => {
+      setUpload('wrist', e.target.files[0]);
+    });
+
+    $('watchUpload').addEventListener('change', e => {
+      setUpload('watch', e.target.files[0]);
+    });
+
+    // ---------------------------------------
+    // MEDIAPIPE WRIST GEOMETRY
+    // ---------------------------------------
+
+    function getGeometry(landmarks, width, height) {
+
+      const point = i => ({
+        x: landmarks[i].x * width,
+        y: landmarks[i].y * height
+      });
+
+      const wrist = point(0);
+
+      const p5 = point(5);
+      const p9 = point(9);
+      const p17 = point(17);
+
+      const base = {
+        x: (p5.x + p9.x + p17.x) / 3,
+        y: (p5.y + p9.y + p17.y) / 3
+      };
+
+      let dx = wrist.x - base.x;
+      let dy = wrist.y - base.y;
+
+      const length = Math.hypot(dx, dy);
+
+      const palmWidth = Math.hypot(
+        p5.x - p17.x,
+        p5.y - p17.y
+      );
+
+      if (length < 5 || palmWidth < 8) {
+        throw new Error(
+          'Cannot reliably identify wrist direction.'
+        );
+      }
+
+      dx /= length;
+      dy /= length;
+
+      // Estimate watch center near the wrist
+      const center = {
+        x: wrist.x + dx * palmWidth * 0.20,
+        y: wrist.y + dy * palmWidth * 0.20
+      };
+
+      return {
+        center,
+        dx,
+        dy,
+        sideX: -dy,
+        sideY: dx,
+        palmWidth
+      };
+    }
+
+    // ---------------------------------------
+    // AUTOMATIC WRIST WIDTH ESTIMATION
+    // ---------------------------------------
+
+    function estimateWristWidth(
+      image,
+      width,
+      height,
+      geom
+    ) {
+
+      const fallback = {
+        width: geom.palmWidth * 0.88,
+        label: 'Landmark-based wrist estimate'
+      };
+
+      const scale = Math.min(
+        1,
+        960 / Math.max(width, height)
+      );
+
+      const w = Math.max(
+        1,
+        Math.round(width * scale)
+      );
+
+      const h = Math.max(
+        1,
+        Math.round(height * scale)
+      );
+
+      const cv = document.createElement('canvas');
+
+      cv.width = w;
+      cv.height = h;
+
+      const ctx = cv.getContext('2d', {
+        willReadFrequently: true
+      });
+
+      ctx.drawImage(image, 0, 0, w, h);
+
+      const data = ctx.getImageData(
+        0, 0, w, h
+      ).data;
+
+      // Average nearby pixel colours
+      function pixel(x, y) {
+
+        const px = Math.round(x * scale);
+        const py = Math.round(y * scale);
+
+        if (
+          px < 2 ||
+          px >= w - 2 ||
+          py < 2 ||
+          py >= h - 2
+        ) {
+          return null;
+        }
+
+        let r = 0;
+        let g = 0;
+        let b = 0;
+
+        for (let yy = -2; yy <= 2; yy++) {
+          for (let xx = -2; xx <= 2; xx++) {
+
+            const i = (
+              (py + yy) * w + px + xx
+            ) * 4;
+
+            r += data[i];
+            g += data[i + 1];
+            b += data[i + 2];
+          }
+        }
+
+        return [
+          r / 25,
+          g / 25,
+          b / 25
+        ];
+      }
+
+      const colorDiff = (a, b) =>
+        Math.hypot(
+          a[0] - b[0],
+          a[1] - b[1],
+          a[2] - b[2]
+        );
+
+      const measurements = [];
+
+      const step = Math.max(
+        2 / scale,
+        geom.palmWidth * 0.016
+      );
+
+      // Measure multiple wrist cross-sections
+      for (
+        const offset of [0.10, 0.20, 0.30, 0.40]
+      ) {
+
+        const center = {
+          x: geom.center.x +
+            geom.dx * geom.palmWidth *
+            (offset - 0.20),
+
+          y: geom.center.y +
+            geom.dy * geom.palmWidth *
+            (offset - 0.20)
+        };
+
+        const skin = pixel(
+          center.x,
+          center.y
+        );
+
+        if (!skin) continue;
+
+        // Locate outer wrist boundary
+        function edge(sign) {
+
+          let consecutive = 0;
+
+          for (
+            let d = geom.palmWidth * 0.25;
+            d <= geom.palmWidth * 1.05;
+            d += step
+          ) {
+
+            const c = pixel(
+              center.x + sign * geom.sideX * d,
+              center.y + sign * geom.sideY * d
+            );
+
+            if (!c) return null;
+
+            if (colorDiff(c, skin) > 58) {
+              consecutive++;
+            } else {
+              consecutive = 0;
+            }
+
+            if (consecutive === 3) {
+              return d - 2 * step;
+            }
+          }
+
+          return null;
+        }
+
+        const a = edge(-1);
+        const b = edge(1);
+
+        if (a === null || b === null) {
+          continue;
+        }
+
+        const measured = a + b;
+
+        if (
+          measured < geom.palmWidth * 0.65 ||
+          measured > geom.palmWidth * 1.7
+        ) {
+          continue;
+        }
+
+        measurements.push({
+          width: measured,
+          sideShift: (b - a) / 2
+        });
+      }
+
+      // Fallback when boundaries are unclear
+      if (measurements.length < 2) {
+        return fallback;
+      }
+
+      const widths = measurements.map(
+        m => m.width
+      );
+
+      if (
+        Math.max(...widths) -
+        Math.min(...widths) >
+        geom.palmWidth * 0.28
+      ) {
+        return fallback;
+      }
+
+      return {
+        width: median(widths),
+
+        sideShift: clamp(
+          median(
+            measurements.map(m => m.sideShift)
+          ),
+          -geom.palmWidth * 0.08,
+          geom.palmWidth * 0.08
+        ),
+
+        label: 'Wrist edges + MediaPipe'
+      };
+    }
+
+    // ---------------------------------------
+    // AUTOMATIC WATCH IMAGE ANALYSIS
+    // ---------------------------------------
+
+    function analyzeWatch(image) {
+
+      const scale = Math.min(
+        1,
+        1200 / Math.max(
+          image.naturalWidth,
+          image.naturalHeight
+        )
+      );
+
+      const w = Math.max(
+        1,
+        Math.round(image.naturalWidth * scale)
+      );
+
+      const h = Math.max(
+        1,
+        Math.round(image.naturalHeight * scale)
+      );
+
+      const temp = document.createElement('canvas');
+
+      temp.width = w;
+      temp.height = h;
+
+      const tc = temp.getContext('2d', {
+        willReadFrequently: true
+      });
+
+      tc.drawImage(image, 0, 0, w, h);
+
+      const data = tc.getImageData(
+        0, 0, w, h
+      ).data;
+
+      let minX = w;
+      let minY = h;
+      let maxX = -1;
+      let maxY = -1;
+      let transparent = 0;
+
+      // Find visible watch pixels
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+
+          const alpha = data[
+            (y * w + x) * 4 + 3
+          ];
+
+          if (alpha < 25) {
+            transparent++;
+          }
+
+          if (alpha > 70) {
+
+            minX = Math.min(minX, x);
+            maxX = Math.max(maxX, x);
+
+            minY = Math.min(minY, y);
+            maxY = Math.max(maxY, y);
+          }
+        }
+      }
+
+      if (maxX < 0) {
+        throw new Error(
+          'The watch PNG is blank.'
+        );
+      }
+
+      if (transparent < w * h * 0.01) {
+        throw new Error(
+          'Use a watch PNG with a transparent background.'
+        );
+      }
+
+      // Crop transparent margins
+      const cropped = document.createElement('canvas');
+
+      cropped.width = maxX - minX + 1;
+      cropped.height = maxY - minY + 1;
+
+      cropped.getContext('2d').drawImage(
+        temp,
+        minX,
+        minY,
+        cropped.width,
+        cropped.height,
+        0,
+        0,
+        cropped.width,
+        cropped.height
+      );
+
+      // Normalize strap orientation
+      let vertical = cropped;
+
+      if (cropped.width > cropped.height) {
+
+        vertical = document.createElement('canvas');
+
+        vertical.width = cropped.height;
+        vertical.height = cropped.width;
+
+        const rot = vertical.getContext('2d');
+
+        rot.translate(
+          vertical.width / 2,
+          vertical.height / 2
+        );
+
+        rot.rotate(Math.PI / 2);
+
+        rot.drawImage(
+          cropped,
+          -cropped.width / 2,
+          -cropped.height / 2
+        );
+      }
+
+      const vctx = vertical.getContext('2d', {
+        willReadFrequently: true
+      });
+
+      const arr = vctx.getImageData(
+        0,
+        0,
+        vertical.width,
+        vertical.height
+      ).data;
+
+      // Measure visible width at each row
+      const rows = [];
+
+      for (let y = 0; y < vertical.height; y++) {
+
+        let a = vertical.width;
+        let b = -1;
+
+        for (let x = 0; x < vertical.width; x++) {
+
+          if (
+            arr[
+              (y * vertical.width + x) * 4 + 3
+            ] > 90
+          ) {
+
+            a = Math.min(a, x);
+            b = Math.max(b, x);
+          }
+        }
+
+        rows.push(
+          b >= a ? b - a + 1 : 0
+        );
+      }
+
+      // Approximate widest watch-case region
+      const caseWidth = Math.max(...rows);
+
+      const groups = [];
+
+      let start = -1;
+
+      for (let y = 0; y <= rows.length; y++) {
+
+        const wide =
+          y < rows.length &&
+          rows[y] >= caseWidth * 0.76;
+
+        if (wide && start < 0) {
+          start = y;
+        }
+
+        if (!wide && start >= 0) {
+
+          groups.push({
+            start,
+            end: y - 1,
+            length: y - start
+          });
+
+          start = -1;
+        }
+      }
+
+      groups.sort(
+        (a, b) => b.length - a.length
+      );
+
+      const region = groups[0];
+
+      const dialY =
+        region &&
+        region.length >= vertical.height * 0.04
+          ? (region.start + region.end) / 2
+          : vertical.height / 2;
+
+      return {
+        canvas: vertical,
+        caseWidth,
+        dialY
+      };
+    }
+
+    // ---------------------------------------
+    // AUTOMATIC WATCH PLACEMENT
+    // ---------------------------------------
+
+    function drawWatch(
+      ctx,
+      analyzed,
+      geom,
+      measurement
+    ) {
+
+      const wristWidth = measurement.width;
+      const watch = analyzed.canvas;
+
+      // Scale based on estimated wrist dimensions
+      const caseDisplayWidth =
+        wristWidth * 0.61;
+
+      const s =
+        caseDisplayWidth / analyzed.caseWidth;
+
+      const totalWidth = watch.width * s;
+      const totalHeight = watch.height * s;
+
+      const maxLength =
+        wristWidth * 1.04;
+
+      // Automatic center alignment
+      const x =
+        geom.center.x +
+        geom.sideX * (measurement.sideShift || 0);
+
+      const y =
+        geom.center.y +
+        geom.sideY * (measurement.sideShift || 0);
+
+      // Rotate according to forearm direction
+      // Align watch strap along the forearm
+// Keep 12 o'clock facing toward the hand
+      // Rotate according to forearm direction
+        let angle = Math.atan2(
+        geom.dy,
+        geom.dx
+);
+
+        while (angle > Math.PI / 2) {
+            angle -= Math.PI;
+}
+
+        while (angle < -Math.PI / 2) {
+            angle += Math.PI;
+}
+      ctx.save();
+
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+
+      // Keep strap inside estimated wrist width
+      const band = document.createElement('canvas');
+
+      band.width = Math.max(
+        1,
+        Math.ceil(totalWidth + 4)
+      );
+
+      band.height = Math.max(
+        1,
+        Math.ceil(
+          Math.min(totalHeight, maxLength) + 4
+        )
+      );
+
+      const bctx = band.getContext('2d');
+
+      const x0 =
+        (band.width - totalWidth) / 2;
+
+      const watchFaceCenterY =
+        analyzed.dialY * s;
+
+      const top =
+        (band.height / 2) -
+        watchFaceCenterY;
+
+      bctx.drawImage(
+        watch,
+        x0,
+        top,
+        totalWidth,
+        totalHeight
+      );
+
+      // Soften outer strap ends
+      bctx.globalCompositeOperation =
+        'destination-in';
+
+      const feather =
+        band.height * 0.07;
+
+      const mask = bctx.createLinearGradient(
+        0, 0,
+        0, band.height
+      );
+
+      mask.addColorStop(
+        0,
+        'rgba(0,0,0,0)'
+      );
+
+      mask.addColorStop(
+        feather / band.height,
+        'rgba(0,0,0,1)'
+      );
+
+      mask.addColorStop(
+        1 - feather / band.height,
+        'rgba(0,0,0,1)'
+      );
+
+      mask.addColorStop(
+        1,
+        'rgba(0,0,0,0)'
+      );
+
+      bctx.fillStyle = mask;
+
+      bctx.fillRect(
+        0,
+        0,
+        band.width,
+        band.height
+      );
+
+      bctx.globalCompositeOperation =
+        'source-over';
+
+      // Draw watch automatically
+      ctx.drawImage(
+        band,
+        -band.width / 2,
+        -band.height / 2
+      );
+
+      ctx.restore();
+
+      return {
+        caseDiameter: caseDisplayWidth,
+        estimatedWristWidth: wristWidth,
+        angleDegrees: angle * 180 / Math.PI
+      };
+    }
+
+    // ---------------------------------------
+    // COMPLETE TRY-ON PROCESS
+    // ---------------------------------------
+
+    async function generate() {
+
+      if (busy) return;
+
+      busy = true;
+      tryOnBtn.disabled = true;
+
+      reset('Loading images...');
+
+      const token = currentRun;
+
+      try {
+
+        // Step 1: Load both images
+        const [wrist, watch] = await Promise.all([
+          loadImage(sources.wrist),
+          loadImage(sources.watch)
+        ]);
+
+        if (token !== currentRun) return;
+
+        status.textContent =
+          'Detecting the hand...';
+
+        // Step 2: MediaPipe detection
+        const hand = await detectHandLandmarks(wrist);
+
+        if (token !== currentRun) return;
+
+        if (
+          !hand?.detected ||
+          !Array.isArray(hand.landmarks)
+        ) {
+
+          throw new Error(
+            'No hand detected. Show the full hand and wrist in the photo.'
+          );
+        }
+
+        // Resize large images for processing
+        const scale = Math.min(
+          1,
+          1500 / Math.max(
+            wrist.naturalWidth,
+            wrist.naturalHeight
+          )
+        );
+
+        const width = Math.round(
+          wrist.naturalWidth * scale
+        );
+
+        const height = Math.round(
+          wrist.naturalHeight * scale
+        );
+
+        // Step 3: Wrist position
+        const geom = getGeometry(
+          hand.landmarks,
+          width,
+          height
+        );
+
+        status.textContent =
+          'Measuring wrist and watch...';
+
+        // Step 4: Wrist width estimation
+        const measurement = estimateWristWidth(
+          wrist,
+          width,
+          height,
+          geom
+        );
+
+        // Step 5: Watch image analysis
+        const analyzed = analyzeWatch(watch);
+
+        if (
+          geom.center.x < 0 ||
+          geom.center.x >= width ||
+          geom.center.y < 0 ||
+          geom.center.y >= height
+        ) {
+
+          throw new Error(
+            'Wrist is too close to the edge of the photo.'
+          );
+        }
+
+        // Step 6: Draw wrist photo
+        preview.width = width;
+        preview.height = height;
+
+        const ctx = preview.getContext('2d');
+
+        ctx.drawImage(
+          wrist,
+          0,
+          0,
+          width,
+          height
+        );
+
+        // Step 7: Automatic watch fitting
+        const metrics = drawWatch(
+          ctx,
+          analyzed,
+          geom,
+          measurement
+        );
+
+        if (token !== currentRun) return;
+
+        // Step 8: Display output
+        ready = true;
+
+        downloadBtn.disabled = false;
+        preview.style.display = 'block';
+
+        status.textContent =
+          'Automatic watch preview generated.';
+
+        details.textContent =
+          measurement.label +
+          ' | Watch case ' +
+          (
+            100 *
+            metrics.caseDiameter /
+            metrics.estimatedWristWidth
+          ).toFixed(0) +
+          '% of visible wrist width';
+
+        console.log(
+          'Automatic fit diagnostics:',
+          {
+            ...metrics,
+            method: measurement.label
+          }
+        );
+
+      } catch (err) {
+
+        if (token === currentRun) {
+
+          status.textContent = err.message;
+
+          console.error(err);
+        }
+
+      } finally {
+
+        busy = false;
+        tryOnBtn.disabled = false;
+      }
+    }
+
+    // Try On button
+    tryOnBtn.addEventListener(
+      'click',
+      generate
+    );
+
+    // Download button
+    downloadBtn.addEventListener('click', () => {
+
+      if (!ready) return;
+
+      const a = document.createElement('a');
+
+      a.href = preview.toDataURL('image/png');
+
+      a.download = 'try-on-time-preview.png';
+
+      a.click();
+    });
+
+  </script>
+
+</body>
+</html>

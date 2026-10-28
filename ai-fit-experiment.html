@@ -1,0 +1,1276 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TRY ON TIME - Virtual Watch Try-On</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <h1>TRY ON <span>TIME</span></h1>
+  <div class="brand-line"></div>
+  <p>Discover Your Perfect Watch, Virtually</p>
+</header>
+
+<main class="main-container">
+  <h2 class="section-title">Experience Your Style</h2>
+  <p class="section-description">
+    Upload your wrist and watch images to see
+    how your favorite watch looks on you.
+  </p>
+
+  <section class="upload-container">
+    <div class="upload-card wrist-card">
+      <div class="upload-icon">📷</div>
+      <h3>Upload Wrist Image</h3>
+      <p>Choose a clear image showing your hand and wrist.</p>
+      <input
+        type="file"
+        id="wristUpload"
+        accept="image/jpeg,image/png"
+      >
+    </div>
+
+    <div class="upload-card watch-card">
+      <div class="upload-icon">⌚</div>
+      <h3>Upload Watch Image</h3>
+      <p>
+        Choose a JPG, PNG or WebP watch image.
+        Background removal happens automatically.
+      </p>
+      <input
+        type="file"
+        id="watchUpload"
+        accept="image/jpeg,image/png,image/webp"
+      >
+    </div>
+  </section>
+
+  <section hidden aria-label="Watch adjustments">
+    <input type="range" id="x" min="-100" max="100" value="0">
+    <span id="xValue">0</span>
+    <input type="range" id="y" min="-100" max="100" value="0">
+    <span id="yValue">0</span>
+    <input type="range" id="size" min="50" max="180" value="100">
+    <span id="sizeValue">100</span>
+    <input type="range" id="angle" min="-180" max="180" value="0">
+    <span id="angleValue">0</span>
+  </section>
+
+  <div class="action-buttons">
+    <button id="tryOnBtn">✨ Try On Watch</button>
+    <button id="resetBtn" class="secondary-btn">Reset</button>
+    <button id="downloadBtn" disabled>Download Preview</button>
+  </div>
+
+  <section class="preview-section">
+    <h2>Your Virtual Watch Preview</h2>
+    <p>Your selected watch will appear on your wrist here.</p>
+    <canvas id="previewCanvas"></canvas>
+    <p id="status" role="status" aria-live="polite">
+      Upload your wrist and watch images to begin.
+    </p>
+  </section>
+</main>
+
+<footer class="site-footer">
+  TRY ON TIME | Virtual Watch Try-On
+</footer>
+
+<script src="js/watchPlacement.js"></script>
+
+<script type="module">
+import { detectHandLandmarks } from './js/wristDetection.js';
+
+const $ = id => document.getElementById(id);
+
+const canvas = $('previewCanvas');
+const status = $('status');
+const tryOnBtn = $('tryOnBtn');
+const resetBtn = $('resetBtn');
+const downloadBtn = $('downloadBtn');
+const wristUpload = $('wristUpload');
+const watchUpload = $('watchUpload');
+
+let wristSource = 'assets/wrist.jpg';
+let watchSource = 'assets/watch.png';
+
+let wristObjectURL = null;
+let watchObjectURL = null;
+
+let generation = 0;
+let busy = false;
+let previewReady = false;
+let processedWatchCache = null;
+
+const clamp = (value, low, high) =>
+  Math.max(low, Math.min(high, value));
+
+const median = values => {
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length / 2)];
+};
+
+function clearPreview(message = 'Preview cleared.') {
+  generation++;
+  previewReady = false;
+  downloadBtn.disabled = true;
+  canvas.style.display = 'none';
+
+  canvas.getContext('2d').clearRect(
+    0, 0, canvas.width, canvas.height
+  );
+
+  status.textContent = message;
+}
+
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(
+      new Error('Unable to load an image.')
+    );
+    image.src = src;
+  });
+}
+
+// =====================================
+// AUTOMATIC WATCH BACKGROUND REMOVAL
+// =====================================
+
+function alreadyHasTransparency(image) {
+  const check = document.createElement('canvas');
+  const factor = Math.min(
+    1,
+    256 / Math.max(
+      image.naturalWidth,
+      image.naturalHeight
+    )
+  );
+
+  check.width = Math.max(
+    1, Math.round(image.naturalWidth * factor)
+  );
+  check.height = Math.max(
+    1, Math.round(image.naturalHeight * factor)
+  );
+
+  const c = check.getContext('2d', {
+    willReadFrequently: true
+  });
+
+  c.drawImage(image, 0, 0, check.width, check.height);
+
+  const data = c.getImageData(
+    0, 0, check.width, check.height
+  ).data;
+
+  let seeThrough = 0;
+
+  for (let i = 3; i < data.length; i += 4) {
+    if (data[i] < 245) seeThrough++;
+  }
+
+  return seeThrough >= (data.length / 4) * 0.01;
+}
+
+async function prepareWatchImage(originalImage, source) {
+  if (processedWatchCache?.source === source) {
+    return {
+      image: processedWatchCache.image,
+      removedBackground: processedWatchCache.removedBackground
+    };
+  }
+
+  if (alreadyHasTransparency(originalImage)) {
+    processedWatchCache = {
+      source,
+      image: originalImage,
+      removedBackground: false
+    };
+
+    return {
+      image: originalImage,
+      removedBackground: false
+    };
+  }
+
+  status.textContent = 'Removing watch background with AI...';
+
+  const resize = Math.min(
+    1,
+    1600 / Math.max(
+      originalImage.naturalWidth,
+      originalImage.naturalHeight
+    )
+  );
+
+  const working = document.createElement('canvas');
+
+  working.width = Math.max(
+    1, Math.round(originalImage.naturalWidth * resize)
+  );
+  working.height = Math.max(
+    1, Math.round(originalImage.naturalHeight * resize)
+  );
+
+  working.getContext('2d').drawImage(
+    originalImage,
+    0,
+    0,
+    working.width,
+    working.height
+  );
+
+  const upload = await new Promise(resolve =>
+    working.toBlob(resolve, 'image/png')
+  );
+
+  if (!upload) {
+    throw new Error('Unable to prepare watch image.');
+  }
+
+  const form = new FormData();
+  form.append('watch_image', upload, 'watch.png');
+
+  let response;
+
+  try {
+    response = await fetch(
+      'http://127.0.0.1:8000/remove-watch-background',
+      {
+        method: 'POST',
+        body: form
+      }
+    );
+  } catch (error) {
+    throw new Error(
+      'Background removal server is offline. Start the Python backend first.'
+    );
+  }
+
+  if (!response.ok) {
+    let reason = `HTTP ${response.status}`;
+
+    try {
+      const details = await response.json();
+      if (typeof details.detail === 'string') {
+        reason = details.detail;
+      }
+    } catch (_) {}
+
+    throw new Error(
+      'Could not remove watch background: ' + reason
+    );
+  }
+
+  const transparentPng = await response.blob();
+
+  if (
+    transparentPng.type &&
+    transparentPng.type !== 'image/png'
+  ) {
+    throw new Error(
+      'The background removal server did not return a PNG.'
+    );
+  }
+
+  const url = URL.createObjectURL(transparentPng);
+
+  try {
+    const cleanImage = await loadImage(url);
+
+    if (!alreadyHasTransparency(cleanImage)) {
+      throw new Error(
+        'The background-removal result is not transparent. Try a clearer watch photo.'
+      );
+    }
+
+    processedWatchCache = {
+      source,
+      image: cleanImage,
+      removedBackground: true
+    };
+
+    return {
+      image: cleanImage,
+      removedBackground: true
+    };
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+// =====================================
+// MEDIAPIPE WRIST GEOMETRY
+// =====================================
+
+function getGeometry(landmarks, width, height) {
+  const point = i => ({
+    x: landmarks[i].x * width,
+    y: landmarks[i].y * height
+  });
+
+  const wrist = point(0);
+  const a = point(5);
+  const b = point(9);
+  const c = point(17);
+
+  const palmCenter = {
+    x: (a.x + b.x + c.x) / 3,
+    y: (a.y + b.y + c.y) / 3
+  };
+
+  let dx = wrist.x - palmCenter.x;
+  let dy = wrist.y - palmCenter.y;
+
+  const length = Math.hypot(dx, dy);
+  const palmWidth = Math.hypot(
+    a.x - c.x,
+    a.y - c.y
+  );
+
+  if (length < 5 || palmWidth < 8) {
+    throw new Error(
+      'Could not calculate wrist direction.'
+    );
+  }
+
+  dx /= length;
+  dy /= length;
+
+  return {
+    center: {
+      x: wrist.x + dx * palmWidth * 0.14,
+      y: wrist.y + dy * palmWidth * 0.14
+    },
+    dx,
+    dy,
+    sideX: -dy,
+    sideY: dx,
+    palmWidth
+  };
+}
+
+// =====================================
+// WRIST WIDTH ESTIMATION
+// =====================================
+
+function estimateWristWidth(
+  image, width, height, geometry
+) {
+  const fallback = {
+    width: geometry.palmWidth * 0.88,
+    label: 'Landmark-based wrist estimate'
+  };
+
+  const scale = Math.min(
+    1, 960 / Math.max(width, height)
+  );
+
+  const w = Math.max(
+    1, Math.round(width * scale)
+  );
+
+  const h = Math.max(
+    1, Math.round(height * scale)
+  );
+
+  const scratch = document.createElement('canvas');
+  scratch.width = w;
+  scratch.height = h;
+
+  const ctx = scratch.getContext('2d', {
+    willReadFrequently: true
+  });
+
+  ctx.drawImage(image, 0, 0, w, h);
+
+  const pixels = ctx.getImageData(
+    0, 0, w, h
+  ).data;
+
+  function pixel(x, y) {
+    const px = Math.round(x * scale);
+    const py = Math.round(y * scale);
+
+    if (
+      px < 2 || py < 2 ||
+      px >= w - 2 || py >= h - 2
+    ) {
+      return null;
+    }
+
+    let r = 0;
+    let g = 0;
+    let b = 0;
+
+    for (let yy = -2; yy <= 2; yy++) {
+      for (let xx = -2; xx <= 2; xx++) {
+        const i = (
+          (py + yy) * w + px + xx
+        ) * 4;
+
+        r += pixels[i];
+        g += pixels[i + 1];
+        b += pixels[i + 2];
+      }
+    }
+
+    return [r / 25, g / 25, b / 25];
+  }
+
+  const colorDiff = (a, b) =>
+    Math.hypot(
+      a[0] - b[0],
+      a[1] - b[1],
+      a[2] - b[2]
+    );
+
+  const step = Math.max(
+    2 / scale,
+    geometry.palmWidth * 0.016
+  );
+
+  const measurements = [];
+
+  for (const offset of [0.10, 0.20, 0.30, 0.40]) {
+    const center = {
+      x: geometry.center.x +
+        geometry.dx *
+        geometry.palmWidth *
+        (offset - 0.20),
+
+      y: geometry.center.y +
+        geometry.dy *
+        geometry.palmWidth *
+        (offset - 0.20)
+    };
+
+    const skin = pixel(center.x, center.y);
+    if (!skin) continue;
+
+    function edge(sign) {
+      let consecutive = 0;
+
+      for (
+        let distance = geometry.palmWidth * 0.25;
+        distance <= geometry.palmWidth * 1.05;
+        distance += step
+      ) {
+        const sample = pixel(
+          center.x +
+            sign * geometry.sideX * distance,
+          center.y +
+            sign * geometry.sideY * distance
+        );
+
+        if (!sample) return null;
+
+        consecutive =
+          colorDiff(sample, skin) > 58
+            ? consecutive + 1
+            : 0;
+
+        if (consecutive === 3) {
+          return distance - 2 * step;
+        }
+      }
+
+      return null;
+    }
+
+    const left = edge(-1);
+    const right = edge(1);
+
+    if (left === null || right === null) {
+      continue;
+    }
+
+    const measured = left + right;
+
+    if (
+      measured < geometry.palmWidth * 0.65 ||
+      measured > geometry.palmWidth * 1.7
+    ) {
+      continue;
+    }
+
+    measurements.push({
+      width: measured,
+      sideShift: (right - left) / 2
+    });
+  }
+
+  if (measurements.length < 2) {
+    return fallback;
+  }
+
+  const widths = measurements.map(item => item.width);
+
+  if (
+    Math.max(...widths) -
+    Math.min(...widths) >
+    geometry.palmWidth * 0.28
+  ) {
+    return fallback;
+  }
+
+  return {
+    width: median(widths),
+
+    sideShift: clamp(
+      median(
+        measurements.map(item => item.sideShift)
+      ),
+      -geometry.palmWidth * 0.08,
+      geometry.palmWidth * 0.08
+    ),
+
+    label: 'Wrist edges + MediaPipe'
+  };
+}
+
+// =====================================
+// WATCH IMAGE ANALYSIS
+// =====================================
+
+function analyzeWatch(image) {
+  const scale = Math.min(
+    1,
+    1200 / Math.max(
+      image.naturalWidth,
+      image.naturalHeight
+    )
+  );
+
+  const width = Math.max(
+    1,
+    Math.round(image.naturalWidth * scale)
+  );
+
+  const height = Math.max(
+    1,
+    Math.round(image.naturalHeight * scale)
+  );
+
+  const temp = document.createElement('canvas');
+  temp.width = width;
+  temp.height = height;
+
+  const ctx = temp.getContext('2d', {
+    willReadFrequently: true
+  });
+
+  ctx.drawImage(image, 0, 0, width, height);
+
+  const pixels = ctx.getImageData(
+    0, 0, width, height
+  ).data;
+
+  let minX = width;
+  let minY = height;
+  let maxX = -1;
+  let maxY = -1;
+  let transparent = 0;
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const alpha = pixels[
+        (y * width + x) * 4 + 3
+      ];
+
+      if (alpha < 25) transparent++;
+
+      if (alpha > 70) {
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+        minY = Math.min(minY, y);
+        maxY = Math.max(maxY, y);
+      }
+    }
+  }
+
+  if (maxX < 0) {
+    throw new Error('The watch PNG is blank.');
+  }
+
+  if (transparent < width * height * 0.01) {
+    throw new Error(
+      'Please use a watch PNG with a transparent background.'
+    );
+  }
+
+  // Crop transparent margins
+  const cropped = document.createElement('canvas');
+
+  cropped.width = maxX - minX + 1;
+  cropped.height = maxY - minY + 1;
+
+  cropped.getContext('2d').drawImage(
+    temp,
+    minX,
+    minY,
+    cropped.width,
+    cropped.height,
+    0,
+    0,
+    cropped.width,
+    cropped.height
+  );
+
+  // Make the watch image vertical
+  let vertical = cropped;
+
+  if (cropped.width > cropped.height) {
+    vertical = document.createElement('canvas');
+
+    vertical.width = cropped.height;
+    vertical.height = cropped.width;
+
+    const rotate = vertical.getContext('2d');
+
+    rotate.translate(
+      vertical.width / 2,
+      vertical.height / 2
+    );
+
+    rotate.rotate(Math.PI / 2);
+
+    rotate.drawImage(
+      cropped,
+      -cropped.width / 2,
+      -cropped.height / 2
+    );
+  }
+
+  // Estimate dial region
+  const array = vertical.getContext('2d', {
+    willReadFrequently: true
+  }).getImageData(
+    0,
+    0,
+    vertical.width,
+    vertical.height
+  ).data;
+
+  const rows = [];
+
+  for (let y = 0; y < vertical.height; y++) {
+    let left = vertical.width;
+    let right = -1;
+
+    for (let x = 0; x < vertical.width; x++) {
+      if (
+        array[
+          (y * vertical.width + x) * 4 + 3
+        ] > 90
+      ) {
+        left = Math.min(left, x);
+        right = Math.max(right, x);
+      }
+    }
+
+    rows.push(
+      right >= left ? right - left + 1 : 0
+    );
+  }
+
+  const caseWidth = Math.max(...rows);
+  const groups = [];
+  let start = -1;
+
+  for (let y = 0; y <= rows.length; y++) {
+    const wide =
+      y < rows.length &&
+      rows[y] >= caseWidth * 0.76;
+
+    if (wide && start < 0) start = y;
+
+    if (!wide && start >= 0) {
+      groups.push({
+        start,
+        end: y - 1,
+        length: y - start
+      });
+      start = -1;
+    }
+  }
+
+  groups.sort(
+    (a, b) => b.length - a.length
+  );
+
+  const region = groups[0];
+
+  const dialY =
+    region &&
+    region.length >= vertical.height * 0.04
+      ? (region.start + region.end) / 2
+      : vertical.height / 2;
+
+  return {
+    canvas: vertical,
+    caseWidth,
+    dialY
+  };
+}
+
+// =====================================
+// WATCH PLACEMENT AND ROTATION
+// =====================================
+
+function drawWatch(
+  ctx, analyzed, geometry, measurement
+) {
+  const wristWidth = measurement.width;
+  const watch = analyzed.canvas;
+
+  const caseDisplayWidth = wristWidth * 0.54;
+
+  const scale =
+    caseDisplayWidth / analyzed.caseWidth;
+
+  const watchWidth = watch.width * scale;
+  const watchHeight = watch.height * scale;
+
+  const maxLength = wristWidth * 1.04;
+
+  const x =
+    geometry.center.x +
+    geometry.sideX *
+    (measurement.sideShift || 0);
+
+  const y =
+    geometry.center.y +
+    geometry.sideY *
+    (measurement.sideShift || 0);
+
+  // Rotation correction for the AI experiment
+  let angle = Math.atan2(
+    geometry.dy,
+    geometry.dx
+  );
+
+  if (!geometry.aiAligned) {
+    while (angle > Math.PI / 2) {
+      angle -= Math.PI;
+    }
+
+    while (angle < -Math.PI / 2) {
+      angle += Math.PI;
+    }
+
+    angle -= 0.18;
+  }
+
+  const band = document.createElement('canvas');
+
+  band.width = Math.max(
+    1, Math.ceil(watchWidth + 4)
+  );
+
+  band.height = Math.max(
+    1,
+    Math.ceil(
+      Math.min(watchHeight, maxLength) + 4
+    )
+  );
+
+  const bandCtx = band.getContext('2d');
+
+  const left =
+    (band.width - watchWidth) / 2;
+
+  const top =
+    band.height / 2 -
+    analyzed.dialY * scale;
+
+  bandCtx.drawImage(
+    watch,
+    left,
+    top,
+    watchWidth,
+    watchHeight
+  );
+
+  // Fade sharp strap ends
+  const feather = band.height * 0.07;
+
+  bandCtx.globalCompositeOperation =
+    'destination-in';
+
+  const mask = bandCtx.createLinearGradient(
+    0, 0, 0, band.height
+  );
+
+  mask.addColorStop(
+    0,
+    'rgba(0,0,0,0)'
+  );
+
+  mask.addColorStop(
+    feather / band.height,
+    'rgba(0,0,0,1)'
+  );
+
+  mask.addColorStop(
+    1 - feather / band.height,
+    'rgba(0,0,0,1)'
+  );
+
+  mask.addColorStop(
+    1,
+    'rgba(0,0,0,0)'
+  );
+
+  bandCtx.fillStyle = mask;
+
+  bandCtx.fillRect(
+    0, 0,
+    band.width,
+    band.height
+  );
+
+  bandCtx.globalCompositeOperation = 'source-over';
+
+  ctx.save();
+
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+
+  ctx.drawImage(
+    band,
+    -band.width / 2,
+    -band.height / 2
+  );
+
+  ctx.restore();
+}
+
+// =====================================
+// SAM 2 AI WRIST REFINEMENT
+// =====================================
+
+async function refineWristWithAI(
+  wristImage, geometry, width, height
+) {
+  const photo = document.createElement('canvas');
+
+  photo.width = width;
+  photo.height = height;
+
+  photo.getContext('2d').drawImage(
+    wristImage, 0, 0, width, height
+  );
+
+  const jpeg = await new Promise(resolve =>
+    photo.toBlob(resolve, 'image/jpeg', 0.86)
+  );
+
+  if (!jpeg) return null;
+
+  const wrist = {
+    x: geometry.center.x -
+      geometry.dx * geometry.palmWidth * 0.14,
+
+    y: geometry.center.y -
+      geometry.dy * geometry.palmWidth * 0.14
+  };
+
+  const data = new FormData();
+
+  data.append('wrist_image', jpeg, 'wrist.jpg');
+
+  data.append('geometry', JSON.stringify({
+    wrist,
+    dx: geometry.dx,
+    dy: geometry.dy,
+    palmWidth: geometry.palmWidth
+  }));
+
+  const controller = new AbortController();
+
+  const timeout = setTimeout(
+    () => controller.abort(),
+    180000
+  );
+
+  try {
+    const response = await fetch(
+      'http://127.0.0.1:8000/refine-fit',
+      {
+        method: 'POST',
+        body: data,
+        signal: controller.signal
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `AI server HTTP ${response.status}`
+      );
+    }
+
+    const result = await response.json();
+
+    if (!result.usedAI) {
+      console.info(
+        'AI fit rejected:', result.reason
+      );
+      return null;
+    }
+
+    const values = [
+      result.width,
+      result.center?.x,
+      result.center?.y,
+      result.dx,
+      result.dy
+    ];
+
+    if (!values.every(Number.isFinite)) {
+      return null;
+    }
+
+    if (
+      result.width < geometry.palmWidth * 0.48 ||
+      result.width > geometry.palmWidth * 1.55 ||
+      result.center.x < 0 ||
+      result.center.x > width ||
+      result.center.y < 0 ||
+      result.center.y > height
+    ) {
+      return null;
+    }
+
+    const axisLength = Math.hypot(
+      result.dx,
+      result.dy
+    );
+
+    if (axisLength < 0.9 || axisLength > 1.1) {
+      return null;
+    }
+
+    const dx = result.dx / axisLength;
+    const dy = result.dy / axisLength;
+
+    console.info('SAM 2 fit:', result);
+
+    return {
+      geometry: {
+        ...geometry,
+        center: result.center,
+        dx,
+        dy,
+        sideX: -dy,
+        sideY: dx,
+        aiAligned: true
+      },
+
+      measurement: {
+        width: result.width,
+        sideShift: 0,
+        label: 'SAM 2 segmented wrist'
+      }
+    };
+  } catch (error) {
+    console.warn(
+      'AI refinement unavailable; using original fit:',
+      error.message
+    );
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+// =====================================
+// GENERATE TRY-ON PREVIEW
+// =====================================
+
+async function startTryOn() {
+  if (busy) return;
+
+  busy = true;
+  tryOnBtn.disabled = true;
+
+  clearPreview('Loading images...');
+
+  const token = generation;
+
+  try {
+    const [wrist, originalWatch] = await Promise.all([
+      loadImage(wristSource),
+      loadImage(watchSource)
+    ]);
+
+    if (token !== generation) return;
+
+    // Automatically remove an opaque watch background
+    const {
+      image: watch,
+      removedBackground
+    } = await prepareWatchImage(
+      originalWatch,
+      watchSource
+    );
+
+    if (token !== generation) return;
+
+    status.textContent =
+      'Detecting wrist using MediaPipe...';
+
+    const result =
+      await detectHandLandmarks(wrist);
+
+    if (token !== generation) return;
+
+    if (
+      !result?.detected ||
+      !Array.isArray(result.landmarks)
+    ) {
+      throw new Error(
+        'No hand detected. Upload a clear hand and wrist image.'
+      );
+    }
+
+    const scale = Math.min(
+      1,
+      1500 / Math.max(
+        wrist.naturalWidth,
+        wrist.naturalHeight
+      )
+    );
+
+    const width = Math.round(
+      wrist.naturalWidth * scale
+    );
+
+    const height = Math.round(
+      wrist.naturalHeight * scale
+    );
+
+    const geometry = getGeometry(
+      result.landmarks,
+      width,
+      height
+    );
+
+    status.textContent =
+      'Calculating automatic watch fit...';
+
+    let measurement = estimateWristWidth(
+      wrist,
+      width,
+      height,
+      geometry
+    );
+
+    status.textContent =
+      'Checking wrist boundaries with AI...';
+
+    const refined = await refineWristWithAI(
+      wrist,
+      geometry,
+      width,
+      height
+    );
+
+    if (token !== generation) return;
+
+    let activeGeometry = geometry;
+
+    if (refined) {
+      activeGeometry = refined.geometry;
+      measurement = refined.measurement;
+    }
+
+    const analyzed = analyzeWatch(watch);
+
+    if (
+      activeGeometry.center.x < 0 ||
+      activeGeometry.center.x >= width ||
+      activeGeometry.center.y < 0 ||
+      activeGeometry.center.y >= height
+    ) {
+      throw new Error(
+        'Wrist is too close to the edge of the image.'
+      );
+    }
+
+    const tempCanvas =
+      document.createElement('canvas');
+
+    tempCanvas.width = width;
+    tempCanvas.height = height;
+
+    const tempCtx = tempCanvas.getContext('2d');
+
+    tempCtx.drawImage(
+      wrist,
+      0,
+      0,
+      width,
+      height
+    );
+
+    drawWatch(
+      tempCtx,
+      analyzed,
+      activeGeometry,
+      measurement
+    );
+
+    if (token !== generation) return;
+
+    canvas.width = width;
+    canvas.height = height;
+
+    canvas.getContext('2d').drawImage(
+      tempCanvas,
+      0,
+      0
+    );
+
+    canvas.style.display = 'block';
+
+    previewReady = true;
+    downloadBtn.disabled = false;
+
+    status.textContent =
+      (
+        refined
+          ? 'AI-assisted watch placement generated (experimental).'
+          : 'Watch placed with original MediaPipe method (AI unavailable or uncertain).'
+      ) +
+      (
+        removedBackground
+          ? ' Watch background removed automatically.'
+          : ''
+      );
+
+  } catch (error) {
+    if (token === generation) {
+      status.textContent = error.message;
+      console.error(error);
+    }
+  } finally {
+    busy = false;
+    tryOnBtn.disabled = false;
+  }
+}
+
+// =====================================
+// BUTTON FUNCTIONS
+// =====================================
+
+tryOnBtn.addEventListener('click', () => {
+  if (previewReady) {
+    clearPreview(
+      'Previous preview cleared. Select another image or try again.'
+    );
+    return;
+  }
+
+  startTryOn();
+});
+
+resetBtn.addEventListener('click', () => {
+  clearPreview(
+    'Reset complete. Upload wrist and watch images to begin.'
+  );
+
+  wristUpload.value = '';
+  watchUpload.value = '';
+
+  wristSource = 'assets/wrist.jpg';
+  watchSource = 'assets/watch.png';
+
+  processedWatchCache = null;
+
+  if (wristObjectURL) {
+    URL.revokeObjectURL(wristObjectURL);
+  }
+
+  if (watchObjectURL) {
+    URL.revokeObjectURL(watchObjectURL);
+  }
+
+  wristObjectURL = null;
+  watchObjectURL = null;
+});
+
+downloadBtn.addEventListener('click', () => {
+  if (!previewReady) return;
+
+  const link = document.createElement('a');
+  link.href = canvas.toDataURL('image/png');
+  link.download = 'try-on-time-preview.png';
+  link.click();
+});
+
+// =====================================
+// IMAGE UPLOAD HANDLING
+// =====================================
+
+function handleUpload(kind, input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  clearPreview(
+    'New image selected. Click Try On Watch.'
+  );
+
+  const accepted =
+    kind === 'wrist'
+      ? ['image/jpeg', 'image/png']
+      : ['image/jpeg', 'image/png', 'image/webp'];
+
+  if (!accepted.includes(file.type)) {
+    status.textContent =
+      kind === 'wrist'
+        ? 'Select a JPG or PNG wrist image.'
+        : 'Select a JPG, PNG or WebP watch image.';
+
+    input.value = '';
+    return;
+  }
+
+  const url = URL.createObjectURL(file);
+
+  if (kind === 'wrist') {
+    if (wristObjectURL) {
+      URL.revokeObjectURL(wristObjectURL);
+    }
+
+    wristObjectURL = url;
+    wristSource = url;
+  } else {
+    if (watchObjectURL) {
+      URL.revokeObjectURL(watchObjectURL);
+    }
+
+    processedWatchCache = null;
+
+    watchObjectURL = url;
+    watchSource = url;
+  }
+}
+
+wristUpload.addEventListener('change', () => {
+  handleUpload('wrist', wristUpload);
+});
+
+watchUpload.addEventListener('change', () => {
+  handleUpload('watch', watchUpload);
+});
+
+</script>
+</body>
+</html>
